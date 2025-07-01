@@ -1,0 +1,4263 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Warzone Team Map</title>
+    <style>
+      body {
+        background: #111;
+        color: white;
+        font-family: Arial;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .header {
+        background: #222;
+        padding: 15px;
+        border-bottom: 2px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 10;
+      }
+
+      .title {
+        font-size: 24px;
+        color: #ff6b35;
+        font-weight: bold;
+      }
+
+      .main-controls {
+        display: flex;
+        gap: 10px;
+      }
+
+      button {
+        padding: 8px 16px;
+        background: #007acc;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .paste-btn {
+        background: #4caf50;
+      }
+      .export-btn {
+        background: #ff6b35;
+      }
+
+      .workspace {
+        display: flex;
+        flex: 1;
+        height: calc(100vh - 54px); /* Subtract header height */
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 300px;
+        background: #1a1a1a;
+        border-right: 2px solid #333;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .map-area {
+        flex: 1;
+        position: relative;
+        background: transparent;
+        overflow: hidden;
+        display: flex;
+      }
+
+      .map-controls {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 100;
+      }
+
+      .mode-controls {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        gap: 10px;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #555;
+      }
+
+      .mode-controls button {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #333;
+        color: white;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #555;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        position: relative;
+      }
+
+      .mode-controls button:hover {
+        background: #444;
+      }
+
+      .mode-controls button.active {
+        background: #4caf50;
+        border-color: #45a049;
+      }
+
+      .mode-controls button .tooltip {
+        position: absolute;
+        bottom: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+      }
+
+      .mode-controls button:hover .tooltip {
+        opacity: 1;
+      }
+
+      .map-controls button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #555;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .map-controls button:hover {
+        background: rgba(0, 0, 0, 0.9);
+      }
+
+      .canvas-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        cursor: grab;
+      }
+
+      .canvas-container.panning {
+        cursor: grabbing !important;
+      }
+
+      .canvas-container.picking {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" stroke="white" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="1" fill="white"/><line x1="12" y1="2" x2="12" y2="6" stroke="white" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="white" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="white" stroke-width="2"/></svg>')
+            12 12,
+          crosshair !important;
+      }
+
+      .canvas-container.moving {
+        cursor: move !important;
+      }
+
+      .canvas-container.scaling {
+        cursor: nwse-resize !important;
+      }
+
+      #mainCanvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .section-title {
+        color: #ff6b35;
+        font-size: 18px;
+        font-weight: bold;
+        margin: 20px 0 15px 0;
+        border-bottom: 1px solid #333;
+        padding-bottom: 5px;
+      }
+
+      .layer-item {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        margin-bottom: 6px;
+        background: #222;
+        border: 1px solid #333;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .layer-item:hover {
+        background: #2a2a2a;
+      }
+
+      .layer-item.active {
+        background: #333;
+        border-color: #4caf50;
+      }
+
+      .layer-item.picking {
+        background: #2c3e50;
+        border-color: #e74c3c;
+      }
+
+      .layer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .layer-name {
+        font-weight: bold;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .layer-controls {
+        display: flex;
+        gap: 6px;
+      }
+
+      .layer-controls button {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: none;
+        background: #444;
+        color: white;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+        padding: 0;
+      }
+
+      .layer-controls button:hover {
+        background: #555;
+      }
+
+      .layer-controls button.active {
+        background: #4caf50;
+      }
+
+      .selected-colors {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+
+      .color-swatch {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        border: 1px solid #555;
+        cursor: pointer;
+        transition: transform 0.1s;
+      }
+
+      .color-swatch:hover {
+        transform: scale(1.1);
+      }
+
+      .color-swatch.active {
+        border: 2px solid white;
+        box-shadow: 0 0 0 1px #000;
+      }
+
+      .background-name {
+        font-weight: bold;
+        color: #ff6b35;
+      }
+
+      .layer-controls {
+        display: flex;
+        gap: 5px;
+      }
+
+      .small-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        background: #666;
+        border: none;
+        border-radius: 3px;
+        color: white;
+        cursor: pointer;
+      }
+
+      .control-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .control-label {
+        color: #aaa;
+        font-size: 12px;
+        min-width: 60px;
+      }
+
+      input[type="range"] {
+        flex: 1;
+        height: 4px;
+      }
+
+      input[type="text"] {
+        background: #444;
+        border: 1px solid #666;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+
+      input[type="checkbox"] {
+        transform: scale(1.2);
+      }
+
+      select {
+        background: #444;
+        border: 1px solid #666;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        flex: 1;
+      }
+
+      input[type="color"] {
+        width: 50px;
+        height: 30px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: #444;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .value-display {
+        color: #aaa;
+        font-size: 11px;
+        min-width: 35px;
+        text-align: right;
+      }
+
+      .add-layer-btn {
+        width: 100%;
+        background: #4caf50;
+        padding: 12px;
+        margin-bottom: 20px;
+      }
+
+      .background-section {
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+
+      .status {
+        background: #333;
+        padding: 10px 20px;
+        text-align: center;
+        font-size: 14px;
+        color: #aaa;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
+      }
+
+      .instructions {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 14px;
+      }
+
+      .empty-state {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        color: #666;
+        font-size: 18px;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        max-width: 80%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 20px;
+        color: #4dabf7;
+      }
+
+      .empty-state-title {
+        font-size: 24px;
+        margin-bottom: 15px;
+        color: #e9ecef;
+      }
+
+      .empty-state-message {
+        font-size: 16px;
+        color: #ced4da;
+        line-height: 1.5;
+      }
+
+      .mode-section {
+        margin-bottom: 15px;
+      }
+
+      .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 5px;
+      }
+
+      .radio-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .radio-option:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      .radio-option input[type="radio"] {
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .radio-option span {
+        font-size: 14px;
+        cursor: pointer;
+        color: white;
+        pointer-events: none;
+      }
+
+      .color-swatches {
+        display: flex;
+        gap: 4px;
+        margin-left: 8px;
+        flex: 1;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .color-swatch {
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid #666;
+        cursor: pointer;
+        position: relative;
+      }
+
+      .color-swatch.empty {
+        background: #333;
+        border: 1px dashed #666;
+      }
+
+      .color-swatch .remove {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 14px;
+        height: 14px;
+        background: #ff4444;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 10px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .color-swatch:hover .remove {
+        opacity: 1;
+      }
+
+      .eyedropper-btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        background: #444;
+        border: 1px solid #666;
+        border-radius: 4px;
+        cursor: pointer;
+        position: relative;
+        transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+      }
+
+      .eyedropper-btn.active {
+        background: #4caf50;
+        border-color: #45a049;
+        box-shadow: 0 0 5px rgba(76, 175, 80, 0.7);
+        transform: scale(1.1);
+      }
+
+      .eyedropper-btn:hover {
+        background: #555;
+      }
+
+      .eyedropper-btn.active:hover {
+        background: #45a049;
+      }
+
+      .color-picker-mode {
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 8px;
+        padding: 10px;
+        margin-bottom: 15px;
+      }
+
+      .color-picker-mode .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        background: transparent;
+        padding: 0;
+        border: none;
+      }
+
+      .color-picker-mode .title {
+        font-size: 14px;
+        color: #4caf50;
+        font-weight: bold;
+      }
+
+      .color-picker-mode .status {
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 4px;
+        margin-bottom: 8px;
+      }
+
+      .color-picker-mode .status.active {
+        color: #4caf50;
+      }
+
+      .color-picker-mode .toggle {
+        display: flex;
+        align-items: center;
+      }
+
+      .color-picker-mode .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+        margin-left: 8px;
+      }
+
+      .color-picker-mode .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .color-picker-mode .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #444;
+        transition: 0.4s;
+        border-radius: 20px;
+      }
+
+      .color-picker-mode .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      .color-picker-mode input:checked + .slider {
+        background-color: #4caf50;
+      }
+
+      .color-picker-mode input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+
+      .color-picker-mode .colors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .color-picker-mode .color-item {
+        position: relative;
+        width: 30px;
+        height: 30px;
+        border-radius: 4px;
+        border: 1px solid #666;
+        cursor: pointer;
+      }
+
+      .color-picker-mode .color-item.selected {
+        box-shadow: 0 0 0 2px #fff, 0 0 0 4px #4caf50;
+        cursor: default;
+      }
+
+      .color-picker-mode .color-item.empty {
+        background: #333;
+        border: 1px dashed #666;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .color-picker-mode .color-item.empty::before {
+        content: "+";
+        color: #666;
+        font-size: 16px;
+      }
+
+      .color-picker-mode .color-item .remove {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 14px;
+        height: 14px;
+        background: #ff4444;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 10px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .color-picker-mode .color-item:hover .remove {
+        opacity: 1;
+      }
+
+      .color-picker-mode .instructions {
+        color: #aaa;
+        font-size: 11px;
+        margin-top: 8px;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .instructions strong {
+        color: #4caf50;
+        font-size: 14px;
+      }
+
+      .instructions-section {
+        margin-bottom: 10px;
+      }
+
+      .key-command {
+        background: #333;
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 2px 5px;
+        font-family: monospace;
+        margin: 0 2px;
+      }
+
+      .toast-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+      }
+
+      .toast {
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        font-size: 14px;
+        animation: toast-slide-in 0.3s ease-out;
+      }
+
+      @keyframes toast-slide-in {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .file-input {
+        display: none;
+      }
+
+      .upload-btn {
+        background: #ff6b35;
+        margin-left: 5px;
+      }
+
+      .paste-options {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        border: 1px solid #555;
+        border-radius: 8px;
+        padding: 10px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .paste-options button {
+        width: 100%;
+        text-align: left;
+        padding: 10px;
+      }
+
+      /* Opacity controls */
+      .opacity-control {
+        display: flex;
+        align-items: center;
+        margin-top: 8px;
+        padding: 5px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+        flex-wrap: wrap;
+      }
+      .opacity-label {
+        font-size: 12px;
+        color: #aaa;
+        margin-right: 5px;
+      }
+      .opacity-value {
+        font-size: 12px;
+        color: #ddd;
+        width: 35px;
+        text-align: right;
+      }
+      .opacity-slider {
+        flex: 1;
+        margin: 5px 0;
+        width: 100%;
+      }
+
+      .color-settings-container {
+        background: #2a2a2a;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 10px;
+      }
+
+      .slider-container {
+        margin: 10px 0;
+      }
+
+      .slider-container label {
+        display: block;
+        margin-bottom: 5px;
+        color: #aaa;
+        font-size: 12px;
+      }
+
+      .slider-value {
+        color: #4caf50;
+        margin-left: 5px;
+      }
+
+      .slider-container input[type="range"] {
+        width: 100%;
+        background: #555;
+        height: 5px;
+        border-radius: 5px;
+        outline: none;
+      }
+
+      .extract-button {
+        width: 100%;
+        background: #4caf50;
+        margin-top: 10px;
+        padding: 8px;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .extract-button:hover {
+        background: #45a049;
+      }
+    </style>
+  </head>
+  <body tabindex="-1">
+    <div class="header">
+      <div class="title">🗺️ Warzone Team Map</div>
+      <div class="main-controls">
+        <button class="export-btn" onclick="exportMap()">📤 Export Map</button>
+        <button onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+        <button onclick="clearAll()">🗑️ Clear All</button>
+      </div>
+    </div>
+
+    <!-- Hidden file inputs for uploads -->
+    <input type="file" id="backgroundFileInput" class="file-input" accept="image/*" onchange="handleBackgroundFileSelect(event)" />
+    <input type="file" id="layerFileInput" class="file-input" accept="image/*" onchange="handleLayerFileSelect(event)" />
+
+    <div class="workspace">
+      <div class="sidebar">
+        <div class="instructions">
+          <div class="instructions-section">
+            <strong>🖱️ Mouse Controls:</strong><br />
+            • Click & drag to <span class="key-command">pan</span> the map view<br />
+            • Hold <span class="key-command">CTRL</span> to move or resize selected layers<br />
+            • <span class="key-command">Middle-click</span> & drag to pan at any time<br />
+            • <span class="key-command">Mouse wheel</span> to zoom in/out<br />
+            • Click layer name to select it<br />
+            • Use color picker buttons to extract colors
+          </div>
+          <div class="instructions-section">
+            <strong>⌨️ Keyboard:</strong><br />
+            • <span class="key-command">Arrow keys</span>: move selected layer<br />
+            • <span class="key-command">Shift+arrows</span>: move faster<br />
+            • <span class="key-command">Delete</span>: remove selected layer<br />
+            • <span class="key-command">CTRL+V</span>: paste from clipboard<br />
+            • <span class="key-command">Escape</span>: exit color picker mode
+          </div>
+        </div>
+
+        <button class="add-layer-btn" onclick="addNewLayer()">➕ Add New Layer</button>
+
+        <div class="section-title">📋 Layers</div>
+        <div id="layerList">
+          <div style="color: #888; text-align: center; padding: 20px">No layers - paste to start</div>
+        </div>
+      </div>
+
+      <div class="map-area">
+        <div class="canvas-container">
+          <canvas id="mainCanvas" width="1200" height="800"></canvas>
+          <div id="emptyState" class="empty-state">
+            <div class="empty-state-icon">🗺️</div>
+            <div class="empty-state-title">No background map loaded</div>
+            <div class="empty-state-message">Please use the "Add Background" button in the sidebar</div>
+          </div>
+        </div>
+        <!-- Mode controls removed - now using CTRL key for move/resize -->
+        <div class="map-controls">
+          <button onclick="zoomIn()" title="Zoom In">+</button>
+          <button onclick="zoomOut()" title="Zoom Out">-</button>
+          <button onclick="resetZoom()" title="Reset Zoom">↺</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="status">Ready - Add a background map to start</div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+      const canvas = document.getElementById("mainCanvas");
+      // Add willReadFrequently attribute for better performance with getImageData
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      // Initialize global state
+      window.ctrlKeyPressed = false;
+
+      let backgroundLayer = null;
+      let layers = [];
+      let activeLayerId = null;
+      let layerCounter = 1;
+
+      // Mouse interaction state
+      let isDragging = false;
+      let isResizing = false;
+      let isPanning = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let resizeHandle = null;
+      let selectedLayer = null;
+
+      // Interaction mode
+      let interactionMode = "pan"; // "pan", "moveScale", "pick"
+
+      // Map view state
+      let mapOffsetX = 0;
+      let mapOffsetY = 0;
+      let mapZoom = 1.0;
+
+      // Helper function to show/hide empty state
+      function showEmptyState() {
+        updateEmptyState();
+      }
+
+      // Add mouse event listeners for canvas interactions
+      canvas.addEventListener("mousedown", function (e) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const canvasX = (mouseX - mapOffsetX) / mapZoom;
+        const canvasY = (mouseY - mapOffsetY) / mapZoom;
+
+        // Left mouse button for panning by default
+        if (e.button === 0 && !e.ctrlKey) {
+          isPanning = true;
+          dragStartX = mouseX;
+          dragStartY = mouseY;
+          canvas.style.cursor = "grabbing";
+          e.preventDefault();
+          return;
+        }
+
+        // CTRL + left mouse for layer manipulation
+        if (e.button === 0 && e.ctrlKey && selectedLayer && selectedLayer !== backgroundLayer && !selectedLayer.isBackground) {
+          // Check if clicking on a resize handle
+          const handle = getResizeHandleAt(canvasX, canvasY, selectedLayer);
+          if (handle) {
+            isResizing = true;
+            resizeHandle = handle;
+            dragStartX = canvasX;
+            dragStartY = canvasY;
+
+            // Store original values for reference during resize
+            selectedLayer.originalX = selectedLayer.x;
+            selectedLayer.originalY = selectedLayer.y;
+            selectedLayer.originalWidth = selectedLayer.width;
+            selectedLayer.originalHeight = selectedLayer.height;
+            selectedLayer.originalScale = selectedLayer.scale || 1;
+
+            e.preventDefault();
+            return;
+          }
+
+          // Check if clicking on the layer itself
+          const scale = selectedLayer.scale || 1;
+          const layerWidth = selectedLayer.width * scale;
+          const layerHeight = selectedLayer.height * scale;
+
+          if (
+            canvasX >= selectedLayer.x &&
+            canvasX <= selectedLayer.x + layerWidth &&
+            canvasY >= selectedLayer.y &&
+            canvasY <= selectedLayer.y + layerHeight
+          ) {
+            isDragging = true;
+            dragStartX = canvasX - selectedLayer.x;
+            dragStartY = canvasY - selectedLayer.y;
+            canvas.style.cursor = "move";
+            e.preventDefault();
+            return;
+          }
+        }
+
+        // Middle mouse button always for panning regardless of mode
+        if (e.button === 1) {
+          isPanning = true;
+          dragStartX = mouseX;
+          dragStartY = mouseY;
+          canvas.style.cursor = "grabbing";
+          e.preventDefault();
+          return;
+        }
+
+        // Left mouse button for other interactions
+        if (e.button === 0) {
+          // Convert mouse coordinates to canvas coordinates
+          const canvasX = (mouseX - mapOffsetX) / mapZoom;
+          const canvasY = (mouseY - mapOffsetY) / mapZoom;
+
+          if (interactionMode === "moveScale" && selectedLayer && !e.ctrlKey) {
+            // Don't allow moving the background layer
+            if (selectedLayer === backgroundLayer || (selectedLayer && selectedLayer.isBackground)) {
+              showToast("Background layer cannot be moved");
+              setInteractionMode("pan");
+              return;
+            }
+
+            // First check if we're over a resize handle
+            resizeHandle = getResizeHandleAt(canvasX, canvasY, selectedLayer);
+
+            if (resizeHandle) {
+              isResizing = true;
+              dragStartX = canvasX;
+              dragStartY = canvasY;
+
+              // Store original dimensions for reference
+              selectedLayer.originalWidth = selectedLayer.width;
+              selectedLayer.originalHeight = selectedLayer.height;
+              selectedLayer.originalX = selectedLayer.x;
+              selectedLayer.originalY = selectedLayer.y;
+              selectedLayer.originalScale = selectedLayer.scale || 1.0;
+
+              e.preventDefault();
+              return;
+            }
+
+            // If not on a handle, check if we're over the layer for moving
+            const scale = selectedLayer.scale || 1;
+            const layerWidth = selectedLayer.width * scale;
+            const layerHeight = selectedLayer.height * scale;
+
+            if (
+              canvasX >= selectedLayer.x &&
+              canvasX <= selectedLayer.x + layerWidth &&
+              canvasY >= selectedLayer.y &&
+              canvasY <= selectedLayer.y + layerHeight
+            ) {
+              isDragging = true;
+              dragStartX = canvasX - selectedLayer.x;
+              dragStartY = canvasY - selectedLayer.y;
+              e.preventDefault();
+            }
+          }
+        }
+      });
+
+      canvas.addEventListener("mousemove", function (e) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Get canvas coordinates
+        const canvasX = (mouseX - mapOffsetX) / mapZoom;
+        const canvasY = (mouseY - mapOffsetY) / mapZoom;
+
+        // Default cursor is grab (for panning)
+        let cursorType = "grab";
+
+        // Update CTRL key state only if it wasn't already set by keydown
+        if (e.ctrlKey) {
+          window.ctrlKeyPressed = true;
+        }
+
+        // If in pick mode, use the custom eyedropper cursor
+        if (interactionMode === "pick") {
+          canvas.style.cursor =
+            'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" stroke="white" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="1" fill="white"/><line x1="12" y1="2" x2="12" y2="6" stroke="white" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="white" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="white" stroke-width="2"/></svg>\') 12 12, crosshair';
+        } else if (
+          window.ctrlKeyPressed &&
+          selectedLayer &&
+          selectedLayer !== backgroundLayer &&
+          !isPanning &&
+          !isDragging &&
+          !isResizing
+        ) {
+          // CTRL key is pressed - enter move/resize mode temporarily
+
+          // Check if we're over a resize handle
+          const handle = getResizeHandleAt(canvasX, canvasY, selectedLayer);
+
+          if (handle) {
+            // Set cursor based on the handle
+            switch (handle) {
+              case "top-left":
+              case "bottom-right":
+                cursorType = "nwse-resize";
+                break;
+              case "top-right":
+              case "bottom-left":
+                cursorType = "nesw-resize";
+                break;
+              case "top":
+              case "bottom":
+                cursorType = "ns-resize";
+                break;
+              case "left":
+              case "right":
+                cursorType = "ew-resize";
+                break;
+            }
+          } else {
+            // Check if over the layer for move cursor
+            const scale = selectedLayer.scale || 1;
+            const layerWidth = selectedLayer.width * scale;
+            const layerHeight = selectedLayer.height * scale;
+
+            if (
+              canvasX >= selectedLayer.x &&
+              canvasX <= selectedLayer.x + layerWidth &&
+              canvasY >= selectedLayer.y &&
+              canvasY <= selectedLayer.y + layerHeight
+            ) {
+              cursorType = "move";
+            }
+          }
+
+          // Apply the cursor
+          canvas.style.cursor = cursorType;
+
+          // Update display to show resize handles
+          updateDisplay();
+        } else if (interactionMode !== "pick") {
+          // Default cursor for pan mode
+          canvas.style.cursor = isPanning ? "grabbing" : "grab";
+          updateDisplay(); // Update to hide resize handles
+        }
+
+        // Panning the map
+        if (isPanning && backgroundLayer) {
+          const newMapOffsetX = mapOffsetX + (mouseX - dragStartX);
+          const newMapOffsetY = mapOffsetY + (mouseY - dragStartY);
+
+          // Calculate the bounds of the background layer in screen space
+          const bgScale = backgroundLayer.scale || 1;
+          const bgWidth = backgroundLayer.width * bgScale * mapZoom;
+          const bgHeight = backgroundLayer.height * bgScale * mapZoom;
+
+          // Calculate the minimum and maximum allowed offsets to keep background visible
+          const minOffsetX = Math.min(0, canvas.width - bgWidth);
+          const maxOffsetX = Math.max(0, canvas.width - bgWidth);
+          const minOffsetY = Math.min(0, canvas.height - bgHeight);
+          const maxOffsetY = Math.max(0, canvas.height - bgHeight);
+
+          // Constrain the offsets to keep the background within view
+          mapOffsetX = Math.max(minOffsetX, Math.min(maxOffsetX, newMapOffsetX));
+          mapOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, newMapOffsetY));
+
+          dragStartX = mouseX;
+          dragStartY = mouseY;
+          updateDisplay();
+          e.preventDefault();
+          return;
+        }
+
+        // Moving a layer
+        if (isDragging && selectedLayer && selectedLayer !== backgroundLayer) {
+          selectedLayer.x = canvasX - dragStartX;
+          selectedLayer.y = canvasY - dragStartY;
+
+          updateDisplay();
+          e.preventDefault();
+          return;
+        }
+
+        // Resizing a layer
+        if (isResizing && selectedLayer && selectedLayer !== backgroundLayer && resizeHandle) {
+          const deltaX = canvasX - dragStartX;
+          const deltaY = canvasY - dragStartY;
+
+          // Original values
+          const origX = selectedLayer.originalX;
+          const origY = selectedLayer.originalY;
+          const origWidth = selectedLayer.originalWidth;
+          const origHeight = selectedLayer.originalHeight;
+          const origScale = selectedLayer.originalScale;
+
+          // Calculate new scale based on the handle being dragged
+          let newScale = origScale;
+          let newX = origX;
+          let newY = origY;
+
+          switch (resizeHandle) {
+            case "bottom-right":
+              newScale = Math.max(0.1, origScale * (1 + deltaX / (origWidth * origScale)));
+              break;
+            case "top-left":
+              newScale = Math.max(0.1, origScale * (1 - deltaX / (origWidth * origScale)));
+              newX = origX + origWidth * origScale - origWidth * newScale;
+              newY = origY + origHeight * origScale - origHeight * newScale;
+              break;
+            case "top-right":
+              newScale = Math.max(0.1, origScale * (1 + deltaX / (origWidth * origScale)));
+              newY = origY + origHeight * origScale - origHeight * newScale;
+              break;
+            case "bottom-left":
+              newScale = Math.max(0.1, origScale * (1 - deltaX / (origWidth * origScale)));
+              newX = origX + origWidth * origScale - origWidth * newScale;
+              break;
+            case "right":
+              newScale = Math.max(0.1, origScale * (1 + deltaX / (origWidth * origScale)));
+              break;
+            case "left":
+              newScale = Math.max(0.1, origScale * (1 - deltaX / (origWidth * origScale)));
+              newX = origX + origWidth * origScale - origWidth * newScale;
+              break;
+            case "top":
+              newScale = Math.max(0.1, origScale * (1 - deltaY / (origHeight * origScale)));
+              newY = origY + origHeight * origScale - origHeight * newScale;
+              break;
+            case "bottom":
+              newScale = Math.max(0.1, origScale * (1 + deltaY / (origHeight * origScale)));
+              break;
+          }
+
+          // Apply the new scale and position
+          selectedLayer.scale = newScale;
+          selectedLayer.x = newX;
+          selectedLayer.y = newY;
+
+          updateDisplay();
+          e.preventDefault();
+        }
+      });
+
+      canvas.addEventListener("mouseup", function (e) {
+        if (isPanning) {
+          isPanning = false;
+          canvas.style.cursor = interactionMode === "pan" ? "grab" : "";
+        }
+
+        if (isDragging) {
+          isDragging = false;
+        }
+
+        if (isResizing) {
+          isResizing = false;
+          resizeHandle = null;
+        }
+      });
+
+      // Add mouse leave event to stop dragging if cursor leaves canvas
+      canvas.addEventListener("mouseleave", function (e) {
+        isPanning = false;
+        isDragging = false;
+        isResizing = false;
+        resizeHandle = null;
+      });
+
+      // Function to set the interaction mode
+      function setInteractionMode(mode) {
+        // Store previous mode and position
+        const prevMode = interactionMode;
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        // Disable any active color picker mode first
+        if (interactionMode === "pick") {
+          // Find any active color picker and disable it
+          for (const layer of layers) {
+            if (layer.isPickerMode) {
+              layer.isPickerMode = false;
+              toggleColorPickerMode(false, layer.id, false);
+            }
+          }
+        }
+
+        interactionMode = mode;
+
+        // Update all layer pick buttons
+        document.querySelectorAll(".layer-controls button").forEach((btn) => {
+          if (btn.title === "Pick Colors") {
+            btn.classList.remove("active");
+          }
+        });
+
+        const canvasContainer = document.querySelector(".canvas-container");
+        canvasContainer.classList.remove("panning", "moving", "scaling", "picking");
+
+        switch (mode) {
+          case "pan":
+            canvasContainer.classList.add("panning");
+            updateStatus("Pan Mode: Click and drag to pan the map view");
+            break;
+          case "pick":
+            // Activate the pick button in the layer controls
+            if (selectedLayer && selectedLayer !== backgroundLayer) {
+              const layerItem = document.querySelector(`.layer-item[onclick*="selectLayer(${selectedLayer.id})"]`);
+              if (layerItem) {
+                const pickBtn = Array.from(layerItem.querySelectorAll(".layer-controls button")).find((btn) => btn.title === "Pick Colors");
+                if (pickBtn) {
+                  pickBtn.classList.add("active");
+                }
+              }
+            }
+
+            canvasContainer.classList.add("picking");
+
+            // Enable color picker for the selected layer, but not for background
+            if (selectedLayer && selectedLayer !== backgroundLayer) {
+              // Always ensure layer is in color mode
+              if (!selectedLayer.colorMode) {
+                changeLayerMode(selectedLayer.id, "color");
+              }
+
+              // Store current filtered image if it exists
+              if (selectedLayer.image !== selectedLayer.originalImage) {
+                selectedLayer._tempImage = selectedLayer.image;
+              }
+
+              toggleColorPickerMode(false, selectedLayer.id, true);
+
+              // Always show the original image for picking
+              selectedLayer.image = selectedLayer.originalImage;
+              updateDisplay();
+              showToast("Click on the image to pick colors");
+
+              // Focus the canvas to ensure keyboard shortcuts work
+              canvas.focus();
+            } else if (selectedLayer === backgroundLayer) {
+              updateStatus("Background layer does not support color picking");
+              showToast("Color picking is not available for the background layer");
+              // Switch back to pan mode
+              setTimeout(() => setInteractionMode("pan"), 100);
+            } else {
+              updateStatus("No layer selected for color picking");
+              showToast("Select a layer first to pick colors from it");
+              // Switch back to pan mode
+              setTimeout(() => setInteractionMode("pan"), 100);
+            }
+            break;
+        }
+
+        // Update color picker button states
+        updateColorPickerButtonStates();
+
+        // Prevent position jumping when changing modes
+        if (prevMode !== mode) {
+          mapOffsetX = prevOffsetX;
+          mapOffsetY = prevOffsetY;
+          updateDisplay();
+        }
+      }
+
+      // Function to show full image when picking colors
+      function showFullImageForPicking(isBackground, layerId) {
+        // Don't allow color picking for background layer
+        if (isBackground) {
+          showToast("Color picking is not available for the background layer");
+          return;
+        }
+
+        // Select the layer first
+        selectLayer(layerId);
+
+        // Switch to pick mode
+        setInteractionMode("pick");
+      }
+
+      // Toggle color picker mode for a specific layer
+      function toggleColorPicker(isBackground, layerId) {
+        // Store current position
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        const layer = layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        // If already in pick mode for this layer, exit pick mode
+        if (layer.isPickerMode === true) {
+          // Clear picker mode for this layer
+          layer.isPickerMode = false;
+          setInteractionMode("pan");
+          showToast("Color picker deactivated");
+        } else {
+          // Clear picker mode for all other layers first
+          layers.forEach((l) => (l.isPickerMode = false));
+
+          // Enter pick mode for the selected layer
+          layer.isPickerMode = true;
+          activeLayerId = layerId;
+
+          // Select the layer
+          selectLayer(layerId);
+
+          // Set interaction mode to pick
+          setInteractionMode("pick");
+
+          showToast("Color picker activated - click on the map to select colors");
+        }
+
+        // Prevent position jumping
+        mapOffsetX = prevOffsetX;
+        mapOffsetY = prevOffsetY;
+        updateDisplay();
+        updateColorPickerButtonStates();
+      }
+
+      // Toggle color picker mode
+      function toggleColorPickerMode(isBackground, layerId, enable) {
+        // Store current position to prevent jumping
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        // Reset all layer picking states
+        document.querySelectorAll(".layer-item").forEach((item) => {
+          item.classList.remove("picking");
+        });
+
+        // Update the layer's picker mode state
+        if (isBackground && backgroundLayer) {
+          backgroundLayer.isPickerMode = enable;
+          if (enable) {
+            document.querySelector(".layer-item.background").classList.add("picking");
+          }
+        } else if (!isBackground) {
+          const layer = layers.find((l) => l.id === layerId);
+          if (layer) {
+            layer.isPickerMode = enable;
+            if (enable) {
+              const layerItem = document.querySelector(`.layer-item[onclick*="selectLayer(${layerId})"]`);
+              if (layerItem) {
+                layerItem.classList.add("picking");
+              }
+            }
+
+            // Always ensure the layer is in color mode
+            if (enable && !layer.colorMode) {
+              changeLayerMode(layerId, "color");
+            }
+          }
+        }
+
+        // Update canvas container class
+        const canvasContainer = document.querySelector(".canvas-container");
+        if (enable) {
+          canvasContainer.classList.add("picking");
+          updateStatus("Color Picker Mode: Click on the image to pick colors");
+        } else {
+          canvasContainer.classList.remove("picking");
+        }
+
+        // Update color picker button states
+        updateColorPickerButtonStates();
+
+        // Restore position to prevent jumping
+        mapOffsetX = prevOffsetX;
+        mapOffsetY = prevOffsetY;
+      }
+
+      // Select a color as active for editing
+      function selectActiveColor(isBackground, layerId, colorIndex) {
+        if (isBackground && backgroundLayer) {
+          backgroundLayer.activeColorIndex = colorIndex;
+        } else {
+          const layer = layers.find((l) => l.id === layerId);
+          if (layer) {
+            layer.activeColorIndex = colorIndex;
+          }
+        }
+        updateLayerList();
+      }
+
+      // Replace an existing color with a new one
+      function replaceSelectedColor(isBackground, layerId, colorIndex, newColor) {
+        const target = isBackground ? backgroundLayer : layers.find((l) => l.id === layerId);
+        if (!target) return;
+
+        initializeColors(target);
+        if (colorIndex >= 0 && colorIndex < target.selectedColors.length) {
+          target.selectedColors[colorIndex] = newColor;
+
+          // Reset active color index to -1 so next click adds a new color
+          target.activeColorIndex = -1;
+
+          updateLayerList();
+          updateExtractedView(isBackground, layerId);
+          showToast(`Color ${colorIndex + 1} updated`);
+        }
+      }
+
+      // Add new functions for color management
+      function initializeColors(obj) {
+        if (!obj.selectedColors) {
+          obj.selectedColors = [];
+          console.log("Initialized empty colors array");
+        }
+        if (obj.activeColorIndex === undefined) {
+          obj.activeColorIndex = -1;
+        }
+      }
+
+      function addSelectedColor(isBackground, layerId, color) {
+        console.log(`Adding color ${color} to ${isBackground ? "background" : "layer " + layerId}`);
+
+        let targetLayer;
+        if (isBackground) {
+          targetLayer = backgroundLayer;
+        } else {
+          targetLayer = layers.find((l) => l.id === layerId);
+        }
+
+        if (!targetLayer) {
+          console.error("Target layer not found");
+          return;
+        }
+
+        // Initialize colors array if needed
+        if (!targetLayer.selectedColors) {
+          targetLayer.selectedColors = [];
+        }
+
+        // Initialize color settings if needed
+        if (targetLayer.colorTolerance === undefined) targetLayer.colorTolerance = 15;
+        if (targetLayer.colorFeather === undefined) targetLayer.colorFeather = 0;
+
+        // Store current position
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        // Check if color already exists
+        if (!targetLayer.selectedColors.includes(color)) {
+          targetLayer.selectedColors.push(color);
+
+          // Show toast notification
+          showToast(`Added color: ${color}`);
+          console.log("Updated colors:", targetLayer.selectedColors);
+
+          // Make sure layer is in color mode and force display of color settings
+          if (!targetLayer.colorMode) {
+            targetLayer.colorMode = true;
+          }
+
+          // Force the layer into color mode and show settings
+          changeLayerMode(layerId, "color");
+
+          // Update the color settings UI
+          updateColorPickerUI(isBackground, layerId);
+
+          // Redraw the layer list to show the new color
+          updateLayerList();
+
+          // Prevent position jumping
+          mapOffsetX = prevOffsetX;
+          mapOffsetY = prevOffsetY;
+          updateDisplay();
+        } else {
+          showToast(`Color ${color} already selected`);
+        }
+      }
+
+      function updateColorPickerUI(isBackground, layerId) {
+        // Store current position
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        console.log(`updateColorPickerUI called for ${isBackground ? "background" : "layer " + layerId}`);
+
+        // Get the target layer
+        let layerObj = isBackground ? backgroundLayer : layers.find((l) => l.id === layerId);
+        if (!layerObj) {
+          console.error("Target layer not found");
+          return;
+        }
+
+        // Ensure layer is in color mode
+        if (!layerObj.colorMode) {
+          layerObj.colorMode = true;
+        }
+
+        // Force a full redraw of the layer list to ensure colors are displayed
+        updateLayerList();
+
+        // Get the layer item element after the redraw
+        const layerItem = isBackground
+          ? document.querySelector(".layer-item.background")
+          : document.querySelector(`.layer-item[onclick*="selectLayer(${layerId})"]`);
+
+        if (!layerItem) {
+          console.error("Layer item not found in DOM");
+          return;
+        }
+
+        // Remove any existing color settings container
+        const existingSettings = layerItem.querySelector(".color-settings-container");
+        if (existingSettings) {
+          layerItem.removeChild(existingSettings);
+        }
+
+        // Log that we're creating a new color settings container
+        console.log("Creating new color settings container for", isBackground ? "background" : `layer ${layerId}`);
+
+        // Get the colors container or create one if it doesn't exist
+        let colorsContainer = layerItem.querySelector(".selected-colors");
+        if (!colorsContainer) {
+          colorsContainer = document.createElement("div");
+          colorsContainer.className = "selected-colors";
+          layerItem.appendChild(colorsContainer);
+        }
+
+        // Clear existing colors
+        colorsContainer.innerHTML = "";
+
+        // We already have the layer object from above
+        if (!layerObj) {
+          console.error("Target layer not found");
+          return;
+        }
+
+        // Initialize color settings if needed
+        if (layerObj.colorTolerance === undefined) layerObj.colorTolerance = 15;
+        if (layerObj.colorFeather === undefined) layerObj.colorFeather = 0;
+
+        const colors = layerObj.selectedColors;
+        console.log("Colors to display:", colors);
+
+        if (!colors || colors.length === 0) return;
+
+        // Add color swatches
+        colors.forEach((color, index) => {
+          const swatch = document.createElement("div");
+          swatch.className = "color-swatch";
+          swatch.style.backgroundColor = color;
+          swatch.title = color;
+
+          // Add click handler to remove color
+          swatch.onclick = (e) => {
+            e.stopPropagation();
+            removeSelectedColor(isBackground, layerId, index);
+          };
+
+          colorsContainer.appendChild(swatch);
+        });
+
+        // Create color settings container
+        const colorSettingsContainer = document.createElement("div");
+        colorSettingsContainer.className = "color-settings-container";
+
+        // Add tolerance slider
+        const toleranceContainer = document.createElement("div");
+        toleranceContainer.className = "slider-container";
+
+        const toleranceLabel = document.createElement("label");
+        toleranceLabel.textContent = "Color Tolerance: ";
+        toleranceLabel.htmlFor = "tolerance-slider-" + (isBackground ? "bg" : layerId);
+
+        const toleranceValue = document.createElement("span");
+        toleranceValue.className = "slider-value";
+        toleranceValue.textContent = targetLayer.colorTolerance;
+        toleranceLabel.appendChild(toleranceValue);
+
+        const toleranceSlider = document.createElement("input");
+        toleranceSlider.type = "range";
+        toleranceSlider.id = "tolerance-slider-" + (isBackground ? "bg" : layerId);
+        toleranceSlider.min = "1";
+        toleranceSlider.max = "50";
+        toleranceSlider.value = layerObj.colorTolerance;
+        toleranceSlider.oninput = (e) => {
+          e.stopPropagation();
+          layerObj.colorTolerance = parseInt(e.target.value);
+          toleranceValue.textContent = layerObj.colorTolerance;
+          updateExtractedView(isBackground, layerId);
+        };
+
+        toleranceContainer.appendChild(toleranceLabel);
+        toleranceContainer.appendChild(toleranceSlider);
+        colorSettingsContainer.appendChild(toleranceContainer);
+
+        // Add feather slider
+        const featherContainer = document.createElement("div");
+        featherContainer.className = "slider-container";
+
+        const featherLabel = document.createElement("label");
+        featherLabel.textContent = "Feather: ";
+        featherLabel.htmlFor = "feather-slider-" + (isBackground ? "bg" : layerId);
+
+        const featherValue = document.createElement("span");
+        featherValue.className = "slider-value";
+        featherValue.textContent = layerObj.colorFeather;
+        featherLabel.appendChild(featherValue);
+
+        const featherSlider = document.createElement("input");
+        featherSlider.type = "range";
+        featherSlider.id = "feather-slider-" + (isBackground ? "bg" : layerId);
+        featherSlider.min = "0";
+        featherSlider.max = "200";
+        featherSlider.value = layerObj.colorFeather;
+        featherSlider.oninput = (e) => {
+          e.stopPropagation();
+          layerObj.colorFeather = parseInt(e.target.value);
+          featherValue.textContent = layerObj.colorFeather;
+          updateExtractedView(isBackground, layerId);
+        };
+
+        featherContainer.appendChild(featherLabel);
+        featherContainer.appendChild(featherSlider);
+        colorSettingsContainer.appendChild(featherContainer);
+
+        layerItem.appendChild(colorSettingsContainer);
+
+        // Prevent position jumping
+        mapOffsetX = prevOffsetX;
+        mapOffsetY = prevOffsetY;
+        updateDisplay();
+
+        console.log(`Added ${colors.length} color swatches to UI`);
+      }
+
+      function removeSelectedColor(isBackground, layerId, colorIndex) {
+        // Store current position
+        const prevOffsetX = mapOffsetX;
+        const prevOffsetY = mapOffsetY;
+
+        let targetLayer;
+        if (isBackground) {
+          targetLayer = backgroundLayer;
+        } else {
+          targetLayer = layers.find((l) => l.id === layerId);
+        }
+
+        if (!targetLayer || !targetLayer.selectedColors) return;
+
+        // Remove the color
+        const removedColor = targetLayer.selectedColors.splice(colorIndex, 1)[0];
+        console.log(`Removed color ${removedColor} at index ${colorIndex} from ${isBackground ? "background" : "layer " + layerId}`);
+
+        // Show toast notification
+        showToast(`Removed color: ${removedColor}`);
+
+        // Update the extracted view
+        updateExtractedView(isBackground, layerId);
+
+        // Update the color settings UI if there are still colors
+        if (targetLayer.selectedColors.length > 0) {
+          updateColorPickerUI(isBackground, layerId);
+        }
+
+        // Redraw the layer list to reflect the removed color
+        updateLayerList();
+
+        // Prevent position jumping
+        mapOffsetX = prevOffsetX;
+        mapOffsetY = prevOffsetY;
+        updateDisplay();
+      }
+
+      function updateExtractedView(isBackground, layerId) {
+        console.log("Updating extracted view", isBackground ? "background" : `layer ${layerId}`);
+
+        if (isBackground && backgroundLayer) {
+          if (backgroundLayer.colorMode && backgroundLayer.selectedColors && backgroundLayer.selectedColors.length > 0) {
+            console.log("Background has colors to extract:", backgroundLayer.selectedColors);
+            extractColorsFromImage(backgroundLayer, backgroundLayer.selectedColors);
+          } else {
+            // Restore original image if not in color mode or no colors selected
+            console.log("Restoring original background image");
+            backgroundLayer.image = backgroundLayer.originalImage;
+            updateDisplay();
+          }
+        } else if (!isBackground) {
+          const layer = layers.find((l) => l.id === layerId);
+          if (layer && layer.colorMode && layer.selectedColors && layer.selectedColors.length > 0) {
+            console.log("Layer has colors to extract:", layer.selectedColors);
+            extractColorsFromImage(layer, layer.selectedColors);
+          } else if (layer) {
+            // Restore original image if not in color mode or no colors selected
+            console.log("Restoring original layer image");
+            layer.image = layer.originalImage;
+            updateDisplay();
+          }
+        }
+      }
+
+      function extractColorsFromImage(layer, colors) {
+        if (!layer || !layer.originalImage || !colors || colors.length === 0) {
+          console.log("Cannot extract colors - invalid parameters", layer, colors);
+          return;
+        }
+
+        console.log("Extracting colors from image:", colors);
+
+        // Create a temporary canvas to process the image
+        const tempCanvas = document.createElement("canvas");
+        const tempCtx = tempCanvas.getContext("2d", { willReadFrequently: true });
+
+        // Set canvas dimensions to match the image
+        tempCanvas.width = layer.originalImage.width;
+        tempCanvas.height = layer.originalImage.height;
+
+        // Draw the original image to the temporary canvas
+        tempCtx.drawImage(layer.originalImage, 0, 0);
+
+        // Get image data
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+
+        // Convert hex colors to RGB for comparison
+        const rgbColors = colors.map(hexToRgb);
+
+        console.log("RGB colors for extraction:", rgbColors);
+
+        // Get tolerance and feather settings (or use defaults)
+        const tolerance = layer.colorTolerance !== undefined ? layer.colorTolerance : 15;
+        const feather = layer.colorFeather !== undefined ? layer.colorFeather : 0;
+
+        console.log(`Using tolerance: ${tolerance}, feather: ${feather}`);
+
+        // Count of pixels matched for debugging
+        let matchedPixels = 0;
+        let totalPixels = data.length / 4;
+
+        // First pass: Identify pixels that match the selected colors within tolerance
+        const width = tempCanvas.width;
+        const height = tempCanvas.height;
+        matchedPixels = 0;
+        let selectedPixels = new Set();
+
+        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // Find minimum distance to any selected color
+          let minDistance = Infinity;
+
+          for (const color of rgbColors) {
+            // Calculate color distance using a weighted formula that accounts for human perception
+            const rMean = (r + color.r) / 2;
+            const dr = r - color.r;
+            const dg = g - color.g;
+            const db = b - color.b;
+
+            // Weighted distance (human eye is more sensitive to green, less to blue)
+            const colorDistance = Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
+            minDistance = Math.min(minDistance, colorDistance);
+          }
+
+          const maxDistance = tolerance * 3;
+          if (minDistance <= maxDistance) {
+            selectedPixels.add(j);
+            matchedPixels++;
+          }
+        }
+
+        // Second pass: Apply feathering using efficient distance transform
+        if (feather > 0) {
+          // Create a distance map using efficient flood-fill approach
+          const distanceMap = new Array(width * height).fill(-1);
+          const queue = [];
+
+          // Initialize queue with selected pixels (distance 0)
+          for (const pixelIndex of selectedPixels) {
+            distanceMap[pixelIndex] = 0;
+            queue.push(pixelIndex);
+          }
+
+          // Breadth-first search to calculate distances efficiently
+          let queueIndex = 0;
+          while (queueIndex < queue.length) {
+            const currentIndex = queue[queueIndex++];
+            const currentDistance = distanceMap[currentIndex];
+
+            // Stop expanding if we've reached the feather limit
+            if (currentDistance >= feather) continue;
+
+            const x = currentIndex % width;
+            const y = Math.floor(currentIndex / width);
+
+            // Check 8-connected neighbors
+            const neighbors = [
+              [-1, -1],
+              [-1, 0],
+              [-1, 1],
+              [0, -1],
+              [0, 1],
+              [1, -1],
+              [1, 0],
+              [1, 1],
+            ];
+
+            for (const [dx, dy] of neighbors) {
+              const nx = x + dx;
+              const ny = y + dy;
+
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const neighborIndex = ny * width + nx;
+                const newDistance = currentDistance + Math.sqrt(dx * dx + dy * dy);
+
+                if (distanceMap[neighborIndex] === -1 && newDistance <= feather) {
+                  distanceMap[neighborIndex] = newDistance;
+                  queue.push(neighborIndex);
+                }
+              }
+            }
+          }
+
+          // Apply opacity based on distance map
+          for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            const distance = distanceMap[j];
+            if (distance >= 0 && distance <= feather) {
+              if (distance === 0) {
+                // Selected pixel - fully opaque
+                data[i + 3] = 255;
+              } else {
+                // In feather zone - gradual opacity
+                const opacity = 255 * (1 - distance / feather);
+                data[i + 3] = Math.max(0, Math.min(255, opacity));
+              }
+            } else {
+              // Outside feather zone - transparent
+              data[i + 3] = 0;
+            }
+          }
+        } else {
+          // No feathering - just apply selected pixels
+          for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            if (selectedPixels.has(j)) {
+              data[i + 3] = 255;
+            } else {
+              data[i + 3] = 0;
+            }
+          }
+        }
+
+        console.log(
+          `Color extraction complete: matched ${matchedPixels} out of ${totalPixels} pixels (${(
+            (matchedPixels / totalPixels) *
+            100
+          ).toFixed(2)}%)`
+        );
+
+        // Put the modified image data back to the canvas
+        tempCtx.putImageData(imageData, 0, 0);
+
+        // Create a new image from the canvas
+        const extractedImage = new Image();
+        extractedImage.src = tempCanvas.toDataURL();
+
+        // Set the extracted image as the layer's current image
+        extractedImage.onload = () => {
+          layer.image = extractedImage;
+          updateDisplay();
+        };
+      }
+
+      function hexToRgb(hex) {
+        // Remove # if present
+        hex = hex.replace(/^#/, "");
+
+        // Parse hex values
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        return { r, g, b };
+      }
+
+      // Add canvas click handler for eyedropper
+      canvas.addEventListener("click", function (e) {
+        // Only process color picking in pick mode
+        if (interactionMode !== "pick") {
+          return;
+        }
+
+        console.log("Canvas click in picking mode");
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Verify we have a selected layer that is not the background
+        if (!selectedLayer) {
+          showToast("No layer selected for color picking");
+          return;
+        }
+
+        if (selectedLayer === backgroundLayer || selectedLayer.isBackground) {
+          showToast("Color picking is not available for the background layer");
+          setInteractionMode("moveScale");
+          return;
+        }
+
+        try {
+          // Make sure we have the original image
+          if (!selectedLayer.originalImage && selectedLayer.image) {
+            selectedLayer.originalImage = selectedLayer.image;
+          }
+
+          // Get the pixel color directly from the main canvas
+          // This ensures we're seeing exactly what the user sees
+          const pixel = ctx.getImageData(mouseX, mouseY, 1, 1).data;
+          console.log("Picked pixel data:", pixel);
+
+          // Check if the pixel is transparent (clicked outside the layer)
+          if (pixel[3] === 0) {
+            showToast("Click within the selected layer to pick colors");
+            return;
+          }
+
+          // Format the color as a hex string
+          const color =
+            "#" +
+            [pixel[0], pixel[1], pixel[2]]
+              .map((x) => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? "0" + hex : hex;
+              })
+              .join("");
+
+          console.log("Picked color:", color, "at position:", mouseX, mouseY, "RGB:", pixel[0], pixel[1], pixel[2]);
+
+          // Add the color to the selected layer (never for background)
+          console.log("Adding layer color:", color, "to layer:", selectedLayer.id);
+          addSelectedColor(false, selectedLayer.id, color);
+
+          // Show a visual indicator at the pick location
+          showPickIndicator(mouseX, mouseY, color);
+
+          // Exit color picking mode after picking a color
+          // Restore the filtered image view if we had one
+          if (selectedLayer._tempImage) {
+            selectedLayer.image = selectedLayer._tempImage;
+            selectedLayer._tempImage = null;
+          }
+
+          // Update the extracted view with the new color
+          if (selectedLayer === backgroundLayer) {
+            updateExtractedView(true, null);
+          } else {
+            updateExtractedView(false, selectedLayer.id);
+          }
+
+          // Switch back to move & scale mode
+          setInteractionMode("moveScale");
+        } catch (error) {
+          console.error("Error picking color:", error);
+          showToast("Error picking color: " + error.message);
+        }
+
+        // Prevent the click from being handled by other handlers
+        e.stopPropagation();
+        e.preventDefault();
+      });
+
+      // Add a function to show a visual indicator when picking a color
+      function showPickIndicator(x, y, color) {
+        const indicator = document.createElement("div");
+        indicator.style.position = "absolute";
+        indicator.style.left = x - 10 + "px";
+        indicator.style.top = y - 10 + "px";
+        indicator.style.width = "20px";
+        indicator.style.height = "20px";
+        indicator.style.borderRadius = "50%";
+        indicator.style.border = "2px solid white";
+        indicator.style.backgroundColor = color;
+        indicator.style.boxShadow = "0 0 5px rgba(0,0,0,0.5)";
+        indicator.style.zIndex = "1000";
+        indicator.style.pointerEvents = "none";
+
+        // Add color text
+        const colorText = document.createElement("div");
+        colorText.style.position = "absolute";
+        colorText.style.left = "25px";
+        colorText.style.top = "0";
+        colorText.style.background = "rgba(0,0,0,0.7)";
+        colorText.style.color = "white";
+        colorText.style.padding = "2px 6px";
+        colorText.style.borderRadius = "4px";
+        colorText.style.fontSize = "12px";
+        colorText.style.fontFamily = "monospace";
+        colorText.textContent = color;
+        indicator.appendChild(colorText);
+
+        document.querySelector(".canvas-container").appendChild(indicator);
+
+        setTimeout(() => {
+          indicator.style.transition = "opacity 0.5s";
+          indicator.style.opacity = "0";
+          setTimeout(() => {
+            indicator.remove();
+          }, 500);
+        }, 1000);
+      }
+
+      // Fix the drawSelectionOutline function to properly handle scaling
+      function drawSelectionOutline(layer) {
+        // Draw selection outline
+        const scale = layer.scale || 1;
+        ctx.strokeStyle = "#4caf50";
+        ctx.lineWidth = 2 / mapZoom;
+        ctx.setLineDash([5 / mapZoom, 5 / mapZoom]);
+        ctx.strokeRect(layer.x, layer.y, layer.width * scale, layer.height * scale);
+        ctx.setLineDash([]);
+      }
+
+      // Fix the updateDisplay function to add a checkerboard pattern outside the background
+      function updateDisplay() {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw checkerboard pattern for the entire canvas
+        drawCheckerboardPattern();
+
+        // Show/hide empty state
+        const emptyState = document.getElementById("emptyState");
+        if (!backgroundLayer) {
+          emptyState.style.display = "flex";
+        } else {
+          emptyState.style.display = "none";
+        }
+
+        // Update cursor based on CTRL key state if not already in a special state
+        if (!isPanning && !isDragging && !isResizing && interactionMode !== "pick") {
+          if (window.ctrlKeyPressed && selectedLayer && selectedLayer !== backgroundLayer) {
+            canvas.style.cursor = "move";
+          } else {
+            canvas.style.cursor = "grab";
+          }
+        }
+
+        // Apply map transform
+        ctx.save();
+        ctx.translate(mapOffsetX, mapOffsetY);
+        ctx.scale(mapZoom, mapZoom);
+
+        // Draw background layer
+        if (backgroundLayer && backgroundLayer.visible && backgroundLayer.image) {
+          const bgScale = backgroundLayer.scale || 1;
+          const bgOpacity = backgroundLayer.opacity || 1;
+
+          // Apply opacity
+          ctx.globalAlpha = bgOpacity;
+
+          // Draw the image with proper scaling
+          ctx.drawImage(
+            backgroundLayer.image,
+            backgroundLayer.x,
+            backgroundLayer.y,
+            backgroundLayer.width * bgScale,
+            backgroundLayer.height * bgScale
+          );
+
+          // Reset opacity
+          ctx.globalAlpha = 1;
+
+          // Draw selection outline if background is selected
+          if (selectedLayer === backgroundLayer) {
+            drawSelectionOutline(backgroundLayer);
+          }
+        }
+
+        // Draw layers in order (bottom to top)
+        layers.forEach((layer) => {
+          if (layer.visible && layer.image) {
+            const layerScale = layer.scale || 1;
+            const layerOpacity = layer.opacity || 1;
+
+            // Apply opacity
+            ctx.globalAlpha = layerOpacity;
+
+            // Draw the image with proper scaling
+            ctx.drawImage(layer.image, layer.x, layer.y, layer.width * layerScale, layer.height * layerScale);
+
+            // Reset opacity
+            ctx.globalAlpha = 1;
+
+            // Draw selection outline if layer is selected
+            if (selectedLayer === layer) {
+              drawSelectionOutline(layer);
+            }
+          }
+        });
+
+        // Draw resize handles if CTRL is pressed and a layer is selected (and not background)
+        if (selectedLayer && selectedLayer !== backgroundLayer && window.ctrlKeyPressed) {
+          drawResizeHandles(selectedLayer);
+        }
+
+        ctx.restore();
+      }
+
+      // Add function to draw a checkerboard pattern
+      function drawCheckerboardPattern() {
+        const tileSize = 20;
+        const darkColor = "#888888";
+        const lightColor = "#AAAAAA";
+
+        ctx.save();
+
+        // Fill the entire canvas
+        for (let x = 0; x < canvas.width; x += tileSize) {
+          for (let y = 0; y < canvas.height; y += tileSize) {
+            const isEvenRow = Math.floor(y / tileSize) % 2 === 0;
+            const isEvenCol = Math.floor(x / tileSize) % 2 === 0;
+
+            ctx.fillStyle = (isEvenRow && isEvenCol) || (!isEvenRow && !isEvenCol) ? lightColor : darkColor;
+            ctx.fillRect(x, y, tileSize, tileSize);
+          }
+        }
+
+        ctx.restore();
+      }
+
+      function handleLayerFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const img = new Image();
+          img.onload = function () {
+            // Get the device pixel ratio to ensure 1:1 scale
+            const pixelRatio = getDevicePixelRatio();
+
+            // Check if we're replacing an existing layer
+            if (window.targetLayerId) {
+              // Find the layer to replace
+              const targetLayer = layers.find((l) => l.id === window.targetLayerId);
+              if (targetLayer) {
+                // Update the layer with the new image
+                targetLayer.width = img.naturalWidth / pixelRatio;
+                targetLayer.height = img.naturalHeight / pixelRatio;
+                targetLayer.image = img;
+                targetLayer.originalImage = img;
+
+                // Reset any color mode settings
+                if (targetLayer.colorMode) {
+                  targetLayer.selectedColors = [];
+                  targetLayer.colorMode = false;
+                }
+
+                // Select the layer
+                selectLayer(targetLayer.id);
+
+                // Update UI
+                updateLayerList();
+                updateDisplay();
+
+                // Show toast notification
+                showToast(`Updated layer: "${targetLayer.name}" from file`);
+
+                // Clear the target layer ID
+                window.targetLayerId = null;
+                return;
+              }
+            }
+
+            // Create a new layer with the loaded image and auto-generated name
+            const newLayer = {
+              id: layerCounter,
+              name: `Layer ${layerCounter}`,
+              x: 50,
+              y: 50,
+              width: img.naturalWidth / pixelRatio,
+              height: img.naturalHeight / pixelRatio,
+              visible: true,
+              colorMode: false,
+              selectedColors: [],
+              isPickerMode: false,
+              image: img,
+              originalImage: img, // Make sure to set originalImage
+              scale: 1.0,
+              opacity: 1.0,
+            };
+
+            // Increment layer counter
+            layerCounter++;
+
+            console.log(
+              `File layer image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${newLayer.width}x${newLayer.height} with pixel ratio: ${pixelRatio}`
+            );
+
+            // Add to layers array
+            layers.push(newLayer);
+
+            // Select the new layer
+            selectLayer(newLayer.id);
+
+            // Switch to moveScale mode
+            setInteractionMode("moveScale");
+
+            // Update UI
+            updateLayerList();
+            updateDisplay();
+
+            // Show toast notification
+            showToast(`Added new layer: "${newLayer.name}" from file`);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+
+        // Reset file input so the same file can be selected again
+        event.target.value = "";
+      }
+
+      function handleBackgroundFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const img = new Image();
+          img.onload = function () {
+            // Get the device pixel ratio to ensure 1:1 scale
+            const pixelRatio = getDevicePixelRatio();
+
+            // Create background layer with the loaded image
+            backgroundLayer = {
+              x: 0,
+              y: 0,
+              width: img.naturalWidth / pixelRatio,
+              height: img.naturalHeight / pixelRatio,
+              visible: true,
+              colorMode: false,
+              selectedColors: [],
+              isPickerMode: false,
+              image: img,
+              originalImage: img, // Make sure to set originalImage
+              scale: 1.0,
+              opacity: 1.0,
+            };
+
+            console.log(
+              `File background image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${backgroundLayer.width}x${backgroundLayer.height} with pixel ratio: ${pixelRatio}`
+            );
+
+            // Reset the initialViewSet flag to trigger proper positioning
+            initialViewSet = false;
+
+            // Select the background layer
+            selectLayer(null);
+
+            // Update UI
+            updateLayerList();
+            updateAddLayerButton();
+            updateModeControlsVisibility();
+            resizeCanvas(); // Use resizeCanvas instead of updateDisplay to set proper view
+
+            // Show toast notification
+            showToast("Background map added from file");
+
+            // Hide empty state
+            updateEmptyState();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+
+        // Reset file input so the same file can be selected again
+        event.target.value = "";
+      }
+
+      // Add a function to get the correct pixel ratio for the device
+      function getDevicePixelRatio() {
+        return window.devicePixelRatio || 1;
+      }
+
+      // Fix canvas size to match display size and ensure background fits properly
+      function resizeCanvas() {
+        const container = canvas.parentElement.parentElement; // Get the map-area
+        const displayWidth = container.clientWidth;
+        const displayHeight = container.clientHeight;
+
+        // Set canvas size to match display size
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+
+        // Set canvas display size to 100%
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+
+        // If we have a background layer, ensure it's fully visible
+        if (backgroundLayer) {
+          // Always keep background at 1:1 scale initially
+          backgroundLayer.scale = 1.0;
+
+          // Background should be fixed at (0,0) and not movable
+          backgroundLayer.x = 0;
+          backgroundLayer.y = 0;
+
+          const bgWidth = backgroundLayer.width;
+          const bgHeight = backgroundLayer.height;
+
+          // If this is the first load or a new background was added
+          if (!initialViewSet) {
+            // Reset the view
+            mapOffsetX = 0;
+            mapOffsetY = 0;
+
+            // Calculate zoom to fit the background to the canvas
+            const zoomX = canvas.width / bgWidth;
+            const zoomY = canvas.height / bgHeight;
+            mapZoom = Math.min(zoomX, zoomY);
+
+            // Center the background if it's smaller than the canvas
+            if (bgWidth * mapZoom < canvas.width) {
+              mapOffsetX = (canvas.width - bgWidth * mapZoom) / 2;
+            }
+
+            if (bgHeight * mapZoom < canvas.height) {
+              mapOffsetY = (canvas.height - bgHeight * mapZoom) / 2;
+            }
+
+            initialViewSet = true;
+          } else {
+            // Ensure zoom is never smaller than what's needed to fill either width or height
+            const minZoomX = canvas.width / bgWidth;
+            const minZoomY = canvas.height / bgHeight;
+            const minZoom = Math.min(minZoomX, minZoomY);
+
+            if (mapZoom < minZoom) {
+              mapZoom = minZoom;
+            }
+          }
+        }
+
+        // Update display
+        updateDisplay();
+
+        // Update UI elements based on background presence
+        updateAddLayerButton();
+        updateModeControlsVisibility();
+      }
+
+      // Function to update mode controls visibility based on background and selected layer
+      function updateModeControlsVisibility() {
+        // Mode controls have been removed, this function is kept for compatibility
+        // If background is selected, automatically set to pan mode
+        if (selectedLayer === backgroundLayer || (selectedLayer && selectedLayer.isBackground)) {
+          setInteractionMode("pan");
+        }
+      }
+
+      // Update the zoomOut function to respect minimum zoom
+      function zoomOut() {
+        const newZoom = mapZoom / 1.2;
+
+        // If we have a background, ensure we don't zoom out too far
+        if (backgroundLayer) {
+          const bgWidth = backgroundLayer.width;
+          const bgHeight = backgroundLayer.height;
+
+          const minZoomX = canvas.width / bgWidth;
+          const minZoomY = canvas.height / bgHeight;
+          const minZoom = Math.min(minZoomX, minZoomY);
+
+          if (newZoom < minZoom) {
+            mapZoom = minZoom;
+            showToast("Reached minimum zoom level");
+          } else {
+            mapZoom = newZoom;
+          }
+        } else {
+          mapZoom = newZoom;
+        }
+
+        updateDisplay();
+        updateStatus(`Zoom: ${Math.round(mapZoom * 100)}%`);
+      }
+
+      // Update the resetZoom function to respect minimum zoom
+      function resetZoom() {
+        mapOffsetX = 0;
+        mapOffsetY = 0;
+
+        if (backgroundLayer) {
+          // Calculate zoom to fit the background to the canvas
+          const bgWidth = backgroundLayer.width;
+          const bgHeight = backgroundLayer.height;
+
+          const zoomX = canvas.width / bgWidth;
+          const zoomY = canvas.height / bgHeight;
+          mapZoom = Math.min(zoomX, zoomY);
+
+          // Center the background if it's smaller than the canvas
+          if (bgWidth * mapZoom < canvas.width) {
+            mapOffsetX = (canvas.width - bgWidth * mapZoom) / 2;
+          }
+
+          if (bgHeight * mapZoom < canvas.height) {
+            mapOffsetY = (canvas.height - bgHeight * mapZoom) / 2;
+          }
+        } else {
+          mapZoom = 1.0;
+        }
+
+        updateDisplay();
+        updateStatus("View reset");
+      }
+
+      // Add a flag to track if we've set the initial view
+      let initialViewSet = false;
+
+      // Call resizeCanvas on window resize
+      window.addEventListener("resize", resizeCanvas);
+
+      // Initial canvas resize
+      setTimeout(() => {
+        resizeCanvas();
+        updateAddLayerButton();
+        updateEmptyState();
+      }, 100);
+
+      // Initialize the UI
+      updateAddLayerButton();
+
+      function pasteBackground() {
+        navigator.clipboard
+          .read()
+          .then((clipboardItems) => {
+            let hasImage = false;
+            for (const clipboardItem of clipboardItems) {
+              for (const type of clipboardItem.types) {
+                if (type.startsWith("image/")) {
+                  hasImage = true;
+                  return clipboardItem.getType(type);
+                }
+              }
+            }
+            if (!hasImage) {
+              throw new Error("No image found in clipboard");
+            }
+          })
+          .then((blob) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+
+            img.onload = () => {
+              // Get the device pixel ratio to ensure 1:1 scale
+              const pixelRatio = getDevicePixelRatio();
+
+              // Create background layer with the pasted image
+              backgroundLayer = {
+                x: 0,
+                y: 0,
+                width: img.naturalWidth / pixelRatio,
+                height: img.naturalHeight / pixelRatio,
+                visible: true,
+                colorMode: false,
+                selectedColors: [],
+                isPickerMode: false,
+                image: img,
+                originalImage: img, // Make sure to set originalImage
+                scale: 1.0,
+                opacity: 1.0,
+                isBackground: true, // Flag to identify as background
+              };
+
+              console.log(
+                `Background image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${backgroundLayer.width}x${backgroundLayer.height} with pixel ratio: ${pixelRatio}`
+              );
+
+              // Reset the initialViewSet flag to trigger proper positioning
+              initialViewSet = false;
+
+              // Select the background layer
+              selectLayer(null);
+
+              // Update UI
+              updateLayerList();
+              updateAddLayerButton();
+              resizeCanvas(); // Use resizeCanvas instead of updateDisplay to set proper view
+
+              // Show toast notification
+              showToast("Background map added from clipboard");
+
+              // Hide empty state
+              updateEmptyState();
+            };
+          })
+          .catch((err) => {
+            console.error("Failed to read clipboard:", err);
+            showToast("No image in clipboard. Try uploading a file instead.");
+            // Offer file upload as an alternative
+            document.getElementById("backgroundFileInput").click();
+          });
+      }
+
+      function pasteToMap() {
+        // If a layer is selected, replace its image
+        if (selectedLayer && selectedLayer !== backgroundLayer) {
+          replaceSelectedLayerImage();
+          return;
+        }
+
+        // Otherwise create a new layer with the clipboard image
+        navigator.clipboard
+          .read()
+          .then((clipboardItems) => {
+            let hasImage = false;
+            for (const clipboardItem of clipboardItems) {
+              for (const type of clipboardItem.types) {
+                if (type.startsWith("image/")) {
+                  hasImage = true;
+                  return clipboardItem.getType(type);
+                }
+              }
+            }
+            if (!hasImage) {
+              throw new Error("No image found in clipboard");
+            }
+          })
+          .then((blob) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+
+            img.onload = () => {
+              // Get the device pixel ratio to ensure 1:1 scale
+              const pixelRatio = getDevicePixelRatio();
+
+              // Create a new layer with the pasted image and auto-generated name
+              const newLayer = {
+                id: layerCounter,
+                name: `Layer ${layerCounter}`,
+                x: 50,
+                y: 50,
+                width: img.naturalWidth / pixelRatio,
+                height: img.naturalHeight / pixelRatio,
+                visible: true,
+                colorMode: false,
+                selectedColors: [],
+                isPickerMode: false,
+                image: img,
+                originalImage: img, // Make sure originalImage is set
+                scale: 1.0,
+                opacity: 1.0,
+              };
+
+              // Increment layer counter
+              layerCounter++;
+
+              console.log(
+                `Layer image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${newLayer.width}x${newLayer.height} with pixel ratio: ${pixelRatio}`
+              );
+
+              // Add to layers array
+              layers.push(newLayer);
+
+              // Select the new layer
+              selectLayer(newLayer.id);
+
+              // Switch to moveScale mode
+              setInteractionMode("moveScale");
+
+              // Update UI
+              updateLayerList();
+              updateDisplay();
+
+              // Show toast notification
+              showToast(`Added new layer: "${newLayer.name}"`);
+            };
+          })
+          .catch((err) => {
+            console.error("Failed to read clipboard:", err);
+            showToast("Failed to read clipboard. Make sure you copied an image.");
+          });
+      }
+
+      function pasteImageToLayer(targetLayer) {
+        navigator.clipboard
+          .read()
+          .then((clipboardItems) => {
+            let hasImage = false;
+            for (const clipboardItem of clipboardItems) {
+              for (const type of clipboardItem.types) {
+                if (type.startsWith("image/")) {
+                  hasImage = true;
+                  return clipboardItem.getType(type);
+                }
+              }
+            }
+            if (!hasImage) {
+              throw new Error("No image found in clipboard");
+            }
+          })
+          .then((blob) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+
+            img.onload = () => {
+              // Get the device pixel ratio to ensure 1:1 scale
+              const pixelRatio = getDevicePixelRatio();
+
+              // Replace the layer's image with the clipboard image
+              targetLayer.width = img.naturalWidth / pixelRatio;
+              targetLayer.height = img.naturalHeight / pixelRatio;
+              targetLayer.image = img;
+              targetLayer.originalImage = img; // Make sure originalImage is set
+              targetLayer.scale = targetLayer.scale || 1.0;
+
+              console.log(
+                `Updated layer image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${targetLayer.width}x${targetLayer.height} with pixel ratio: ${pixelRatio}`
+              );
+
+              // Reset any color mode settings
+              if (targetLayer.colorMode) {
+                targetLayer.selectedColors = [];
+              }
+
+              // Update UI
+              updateLayerList();
+              updateDisplay();
+
+              // Show toast notification
+              showToast(`Updated layer "${targetLayer.name}" with clipboard image`);
+            };
+          })
+          .catch((err) => {
+            console.error("Failed to read clipboard:", err);
+            showToast("Failed to read clipboard. Make sure you copied an image.");
+          });
+      }
+
+      // Update file handlers to also account for pixel ratio
+      function handleLayerFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const img = new Image();
+          img.onload = function () {
+            // Get the device pixel ratio to ensure 1:1 scale
+            const pixelRatio = getDevicePixelRatio();
+
+            // Check if we're replacing an existing layer
+            if (window.targetLayerId) {
+              // Find the layer to replace
+              const targetLayer = layers.find((l) => l.id === window.targetLayerId);
+              if (targetLayer) {
+                // Update the layer with the new image
+                targetLayer.width = img.naturalWidth / pixelRatio;
+                targetLayer.height = img.naturalHeight / pixelRatio;
+                targetLayer.image = img;
+                targetLayer.originalImage = img;
+
+                // Reset any color mode settings
+                if (targetLayer.colorMode) {
+                  targetLayer.selectedColors = [];
+                  targetLayer.colorMode = false;
+                }
+
+                // Select the layer
+                selectLayer(targetLayer.id);
+
+                // Update UI
+                updateLayerList();
+                updateDisplay();
+
+                // Show toast notification
+                showToast(`Updated layer: "${targetLayer.name}" from file`);
+
+                // Clear the target layer ID
+                window.targetLayerId = null;
+                return;
+              }
+            }
+
+            // Create a new layer with the loaded image and auto-generated name
+            const newLayer = {
+              id: layerCounter,
+              name: `Layer ${layerCounter}`,
+              x: 50,
+              y: 50,
+              width: img.naturalWidth / pixelRatio,
+              height: img.naturalHeight / pixelRatio,
+              visible: true,
+              colorMode: false,
+              selectedColors: [],
+              isPickerMode: false,
+              image: img,
+              originalImage: img, // Make sure to set originalImage
+              scale: 1.0,
+              opacity: 1.0,
+            };
+
+            // Increment layer counter
+            layerCounter++;
+
+            console.log(
+              `File layer image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${newLayer.width}x${newLayer.height} with pixel ratio: ${pixelRatio}`
+            );
+
+            // Add to layers array
+            layers.push(newLayer);
+
+            // Select the new layer
+            selectLayer(newLayer.id);
+
+            // Switch to moveScale mode
+            setInteractionMode("moveScale");
+
+            // Update UI
+            updateLayerList();
+            updateDisplay();
+
+            // Show toast notification
+            showToast(`Added new layer: "${newLayer.name}" from file`);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+
+        // Reset file input so the same file can be selected again
+        event.target.value = "";
+      }
+
+      function handleBackgroundFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const img = new Image();
+          img.onload = function () {
+            // Get the device pixel ratio to ensure 1:1 scale
+            const pixelRatio = getDevicePixelRatio();
+
+            // Create background layer with the loaded image
+            backgroundLayer = {
+              x: 0,
+              y: 0,
+              width: img.naturalWidth / pixelRatio,
+              height: img.naturalHeight / pixelRatio,
+              visible: true,
+              colorMode: false,
+              selectedColors: [],
+              isPickerMode: false,
+              image: img,
+              originalImage: img, // Make sure to set originalImage
+              scale: 1.0,
+              opacity: 1.0,
+            };
+
+            console.log(
+              `File background image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${backgroundLayer.width}x${backgroundLayer.height} with pixel ratio: ${pixelRatio}`
+            );
+
+            // Reset the initialViewSet flag to trigger proper positioning
+            initialViewSet = false;
+
+            // Select the background layer
+            selectLayer(null);
+
+            // Update UI
+            updateLayerList();
+            updateAddLayerButton();
+            updateModeControlsVisibility();
+            resizeCanvas(); // Use resizeCanvas instead of updateDisplay to set proper view
+
+            // Show toast notification
+            showToast("Background map added from file");
+
+            // Hide empty state
+            updateEmptyState();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+
+        // Reset file input so the same file can be selected again
+        event.target.value = "";
+      }
+
+      function addEmptyLayer() {
+        hidePasteOptions();
+
+        // Create an empty layer with auto-generated name
+        const name = `Layer ${layerCounter}`;
+
+        // Create a placeholder image
+        const placeholderImg = createPlaceholderImage(300, 300);
+
+        const newLayer = {
+          id: layerCounter,
+          name: name,
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 300,
+          visible: true,
+          colorMode: false,
+          selectedColors: [],
+          isPickerMode: false,
+          image: placeholderImg,
+          originalImage: placeholderImg, // Make sure originalImage is set
+          scale: 1.0,
+          opacity: 1.0,
+        };
+
+        // Increment layer counter
+        layerCounter++;
+
+        // Add to layers array
+        layers.push(newLayer);
+
+        // Select the new layer
+        selectLayer(newLayer.id);
+
+        // Update UI
+        updateLayerList();
+        updateDisplay();
+
+        // Show toast notification
+        showToast(`Added empty layer: "${name}"`);
+      }
+
+      // Helper function to create placeholder image
+      function createPlaceholderImage(width, height) {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext("2d");
+
+        // Fill with light gray
+        tempCtx.fillStyle = "#333333";
+        tempCtx.fillRect(0, 0, width, height);
+
+        // Draw a grid pattern
+        tempCtx.strokeStyle = "#444444";
+        tempCtx.lineWidth = 1;
+
+        // Draw vertical lines
+        for (let x = 0; x < width; x += 20) {
+          tempCtx.beginPath();
+          tempCtx.moveTo(x, 0);
+          tempCtx.lineTo(x, height);
+          tempCtx.stroke();
+        }
+
+        // Draw horizontal lines
+        for (let y = 0; y < height; y += 20) {
+          tempCtx.beginPath();
+          tempCtx.moveTo(0, y);
+          tempCtx.lineTo(width, y);
+          tempCtx.stroke();
+        }
+
+        // Add text
+        tempCtx.fillStyle = "#AAAAAA";
+        tempCtx.font = "20px Arial";
+        tempCtx.textAlign = "center";
+        tempCtx.textBaseline = "middle";
+        tempCtx.fillText("Empty Layer", width / 2, height / 2);
+
+        // Convert to image
+        const img = new Image();
+        img.src = tempCanvas.toDataURL();
+        return img;
+      }
+
+      // Fix for ReferenceError: selectLayer is not defined at img.onload
+      function selectLayer(layerId) {
+        // Update active layer ID
+        activeLayerId = layerId;
+
+        // Find the selected layer
+        if (layerId === null) {
+          selectedLayer = backgroundLayer;
+
+          // Always force pan mode for background layer
+          if (interactionMode === "pick") {
+            setInteractionMode("pan");
+            showToast("Background layer cannot have colors picked");
+          }
+        } else {
+          selectedLayer = layers.find((l) => l.id === layerId);
+
+          // If this is a background layer, force pan mode
+          if (selectedLayer && selectedLayer.isBackground) {
+            setInteractionMode("pan");
+          }
+        }
+
+        // Update layer list UI
+        updateLayerList();
+        updateDisplay();
+
+        // Update status
+        if (selectedLayer) {
+          updateStatus(`Selected: ${selectedLayer === backgroundLayer ? "Background" : selectedLayer.name}`);
+        } else {
+          updateStatus("No layer selected");
+        }
+      }
+
+      // Update the add layer button text based on whether background exists
+      function updateAddLayerButton() {
+        const addLayerBtn = document.querySelector(".add-layer-btn");
+        const sidebarTitle = document.querySelector(".sidebar-title");
+
+        if (sidebarTitle) {
+          sidebarTitle.textContent = backgroundLayer ? "Layers" : "Add a background to start";
+        }
+
+        if (!backgroundLayer) {
+          addLayerBtn.textContent = "➕ Add Background";
+          addLayerBtn.onclick = function (event) {
+            // Show options to paste or upload background
+            const rect = addLayerBtn.getBoundingClientRect();
+
+            // Remove any existing options popup first
+            const existingOptions = document.querySelector(".paste-options");
+            if (existingOptions && existingOptions.parentNode) {
+              existingOptions.parentNode.removeChild(existingOptions);
+            }
+
+            const options = document.createElement("div");
+            options.className = "paste-options";
+            options.style.display = "flex";
+            options.style.position = "absolute";
+            options.style.top = rect.bottom + 5 + "px";
+            options.style.left = rect.left + "px";
+            options.style.zIndex = "2000";
+
+            const pasteBtn = document.createElement("button");
+            pasteBtn.textContent = "📋 Paste from Clipboard";
+            pasteBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              pasteBackground();
+            };
+            options.appendChild(pasteBtn);
+
+            const uploadBtn = document.createElement("button");
+            uploadBtn.textContent = "📁 Upload from File";
+            uploadBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              document.getElementById("backgroundFileInput").click();
+            };
+            options.appendChild(uploadBtn);
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "❌ Cancel";
+            cancelBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+            };
+            options.appendChild(cancelBtn);
+
+            document.body.appendChild(options);
+
+            // Close when clicking outside
+            const closeOnClick = (evt) => {
+              if (!options.contains(evt.target) && evt.target !== addLayerBtn) {
+                if (options.parentNode) {
+                  options.parentNode.removeChild(options);
+                }
+                document.removeEventListener("click", closeOnClick);
+              }
+            };
+            setTimeout(() => {
+              document.addEventListener("click", closeOnClick);
+            }, 100);
+
+            if (event) {
+              event.stopPropagation();
+            }
+          };
+        } else {
+          addLayerBtn.textContent = "➕ Add New Layer";
+          addLayerBtn.onclick = function (event) {
+            addNewLayer(event);
+          };
+        }
+      }
+
+      // Fix for ReferenceError: addNewLayer is not defined at HTMLButtonElement.onclick
+      function addNewLayer(event) {
+        // Don't allow adding layers if there's no background
+        if (!backgroundLayer) {
+          showToast("Please add a background map first");
+          return;
+        }
+
+        // Remove any existing options popup first
+        const existingOptions = document.querySelector(".paste-options");
+        if (existingOptions && existingOptions.parentNode) {
+          existingOptions.parentNode.removeChild(existingOptions);
+        }
+
+        // Show paste options popup
+        const pasteBtn = document.querySelector(".add-layer-btn");
+
+        // Get position of the button
+        const rect = pasteBtn.getBoundingClientRect();
+
+        // Create paste options popup dynamically
+        const pasteOptions = document.createElement("div");
+        pasteOptions.className = "paste-options";
+        pasteOptions.style.display = "flex";
+        pasteOptions.style.position = "absolute";
+        pasteOptions.style.top = rect.bottom + 5 + "px";
+        pasteOptions.style.left = rect.left + "px";
+        pasteOptions.style.zIndex = "2000"; // Ensure it's on top
+
+        // Add buttons
+        const pasteBtn1 = document.createElement("button");
+        pasteBtn1.textContent = "📋 Paste from Clipboard";
+        pasteBtn1.onclick = (e) => {
+          e.stopPropagation();
+          if (pasteOptions.parentNode) {
+            pasteOptions.parentNode.removeChild(pasteOptions);
+          }
+          pasteToMap();
+        };
+        pasteOptions.appendChild(pasteBtn1);
+
+        const uploadBtn = document.createElement("button");
+        uploadBtn.textContent = "📁 Upload from File";
+        uploadBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (pasteOptions.parentNode) {
+            pasteOptions.parentNode.removeChild(pasteOptions);
+          }
+          document.getElementById("layerFileInput").click();
+        };
+        pasteOptions.appendChild(uploadBtn);
+
+        const emptyBtn = document.createElement("button");
+        emptyBtn.textContent = "✏️ Add Empty Layer";
+        emptyBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (pasteOptions.parentNode) {
+            pasteOptions.parentNode.removeChild(pasteOptions);
+          }
+          addEmptyLayer();
+        };
+        pasteOptions.appendChild(emptyBtn);
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "❌ Cancel";
+        cancelBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (pasteOptions.parentNode) {
+            pasteOptions.parentNode.removeChild(pasteOptions);
+          }
+        };
+        pasteOptions.appendChild(cancelBtn);
+
+        // Add to document
+        document.body.appendChild(pasteOptions);
+
+        // Close when clicking outside
+        const closeOnClick = (evt) => {
+          if (!pasteOptions.contains(evt.target) && evt.target !== pasteBtn) {
+            if (pasteOptions.parentNode) {
+              pasteOptions.parentNode.removeChild(pasteOptions);
+            }
+            document.removeEventListener("click", closeOnClick);
+          }
+        };
+
+        setTimeout(() => {
+          document.addEventListener("click", closeOnClick);
+        }, 100);
+
+        // Prevent this click from immediately closing the popup
+        if (event) {
+          event.stopPropagation();
+        }
+      }
+
+      // Update the button click handler to pass the event
+      document.querySelector(".add-layer-btn").onclick = function (event) {
+        addNewLayer(event);
+      };
+
+      function pasteFromClipboard() {
+        // Find and remove any paste options popup
+        const pasteOptions = document.querySelector(".paste-options");
+        if (pasteOptions && pasteOptions.parentNode) {
+          pasteOptions.parentNode.removeChild(pasteOptions);
+        }
+        pasteToMap();
+      }
+
+      // Functions removed - no longer needed
+
+      function toggleLayerVisibility(isBackground, layerId) {
+        if (isBackground && backgroundLayer) {
+          backgroundLayer.visible = !backgroundLayer.visible;
+          updateLayerList();
+          updateDisplay();
+          showToast(`Background ${backgroundLayer.visible ? "visible" : "hidden"}`);
+        } else {
+          const layer = layers.find((l) => l.id === layerId);
+          if (layer) {
+            layer.visible = !layer.visible;
+            updateLayerList();
+            updateDisplay();
+            showToast(`Layer "${layer.name}" ${layer.visible ? "visible" : "hidden"}`);
+          }
+        }
+      }
+
+      function changeBackgroundMode(mode) {
+        if (!backgroundLayer) return;
+
+        backgroundLayer.colorMode = mode === "color";
+
+        if (mode === "color") {
+          // If switching to color mode, make sure we have the original image
+          if (!backgroundLayer.originalImage) {
+            backgroundLayer.originalImage = backgroundLayer.image;
+          }
+
+          // Extract colors if we have any selected
+          if (backgroundLayer.selectedColors && backgroundLayer.selectedColors.length > 0) {
+            updateExtractedView(true, null);
+          }
+        } else {
+          // If switching to normal mode, restore original image
+          backgroundLayer.image = backgroundLayer.originalImage;
+        }
+
+        updateLayerList();
+        updateDisplay();
+        showToast(`Background switched to ${mode} mode`);
+      }
+
+      function changeLayerMode(layerId, mode) {
+        const layer = layers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        layer.colorMode = mode === "color";
+
+        if (mode === "color") {
+          // If switching to color mode, make sure we have the original image
+          if (!layer.originalImage) {
+            layer.originalImage = layer.image;
+          }
+
+          // Initialize color settings if needed
+          if (layer.colorTolerance === undefined) layer.colorTolerance = 15;
+          if (layer.colorFeather === undefined) layer.colorFeather = 0;
+
+          // Extract colors if we have any selected
+          if (layer.selectedColors && layer.selectedColors.length > 0) {
+            updateExtractedView(false, layerId);
+          }
+
+          // Show color settings UI
+          updateColorPickerUI(false, layerId);
+        } else {
+          // If switching to normal mode, restore original image
+          layer.image = layer.originalImage;
+        }
+
+        updateLayerList();
+        updateDisplay();
+        showToast(`Layer "${layer.name}" switched to ${mode} mode`);
+      }
+
+      function removeLayer(layerId) {
+        const layerIndex = layers.findIndex((l) => l.id === layerId);
+        if (layerIndex === -1) return;
+
+        const layer = layers[layerIndex];
+
+        // Confirm removal
+        if (confirm(`Delete layer "${layer.name}"?`)) {
+          layers.splice(layerIndex, 1);
+
+          // If this was the active layer, select another layer
+          if (activeLayerId === layerId) {
+            if (layers.length > 0) {
+              selectLayer(layers[0].id);
+            } else {
+              selectLayer(null);
+            }
+          }
+
+          updateLayerList();
+          updateDisplay();
+          showToast(`Layer "${layer.name}" removed`);
+        }
+      }
+
+      function updateStatus(msg) {
+        document.getElementById("status").textContent = msg;
+      }
+
+      function showToast(message) {
+        const toastContainer = document.getElementById("toastContainer");
+        const toast = document.createElement("div");
+        toast.className = "toast";
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+          toast.classList.add("fade-out");
+          setTimeout(() => {
+            toastContainer.removeChild(toast);
+          }, 300);
+        }, 3000);
+      }
+
+      function zoomIn() {
+        mapZoom *= 1.2;
+        updateDisplay();
+        updateStatus(`Zoom: ${Math.round(mapZoom * 100)}%`);
+      }
+
+      function updateEmptyState() {
+        const emptyState = document.getElementById("emptyState");
+        if (!backgroundLayer) {
+          emptyState.innerHTML = `
+            <div class="empty-state-icon">🗺️</div>
+            <div class="empty-state-title">No background map loaded</div>
+            <div class="empty-state-message">Please use the "Add Background" button in the sidebar</div>
+          `;
+          emptyState.style.display = "flex";
+        } else {
+          emptyState.style.display = "none";
+        }
+      }
+
+      // Add these functions for scaling layers
+      function drawResizeHandles(layer) {
+        if (layer === backgroundLayer) return;
+
+        const scale = layer.scale || 1;
+        const handleSize = 10 / mapZoom;
+        const x = layer.x;
+        const y = layer.y;
+        const width = layer.width * scale;
+        const height = layer.height * scale;
+
+        // Draw handles at each corner and middle of each side
+        ctx.fillStyle = "#4caf50";
+
+        // Corners
+        ctx.fillRect(x - handleSize / 2, y - handleSize / 2, handleSize, handleSize); // Top-left
+        ctx.fillRect(x + width - handleSize / 2, y - handleSize / 2, handleSize, handleSize); // Top-right
+        ctx.fillRect(x - handleSize / 2, y + height - handleSize / 2, handleSize, handleSize); // Bottom-left
+        ctx.fillRect(x + width - handleSize / 2, y + height - handleSize / 2, handleSize, handleSize); // Bottom-right
+
+        // Middle of sides
+        ctx.fillRect(x + width / 2 - handleSize / 2, y - handleSize / 2, handleSize, handleSize); // Top
+        ctx.fillRect(x + width - handleSize / 2, y + height / 2 - handleSize / 2, handleSize, handleSize); // Right
+        ctx.fillRect(x + width / 2 - handleSize / 2, y + height - handleSize / 2, handleSize, handleSize); // Bottom
+        ctx.fillRect(x - handleSize / 2, y + height / 2 - handleSize / 2, handleSize, handleSize); // Left
+      }
+
+      // Update color picker button states based on current mode
+      function updateColorPickerButtonStates() {
+        // Find all eyedropper buttons and update their state
+        const eyedropperButtons = document.querySelectorAll(".eyedropper-btn");
+        eyedropperButtons.forEach((btn) => {
+          const layerId = btn.dataset.layerId;
+          const layer = layers.find((l) => l.id === layerId);
+          if (layer && layer.isPickerMode === true) {
+            btn.classList.add("active");
+          } else {
+            btn.classList.remove("active");
+          }
+        });
+      }
+
+      function getResizeHandleAt(x, y, layer) {
+        if (!layer) return null;
+
+        const scale = layer.scale || 1;
+        const handleSize = 10 / mapZoom;
+        const layerX = layer.x;
+        const layerY = layer.y;
+        const width = layer.width * scale;
+        const height = layer.height * scale;
+
+        // Check if the point is within any of the resize handles
+        const halfHandle = handleSize / 2;
+
+        // Top-left
+        if (Math.abs(x - layerX) <= halfHandle && Math.abs(y - layerY) <= halfHandle) {
+          return "top-left";
+        }
+
+        // Top-right
+        if (Math.abs(x - (layerX + width)) <= halfHandle && Math.abs(y - layerY) <= halfHandle) {
+          return "top-right";
+        }
+
+        // Bottom-left
+        if (Math.abs(x - layerX) <= halfHandle && Math.abs(y - (layerY + height)) <= halfHandle) {
+          return "bottom-left";
+        }
+
+        // Bottom-right
+        if (Math.abs(x - (layerX + width)) <= halfHandle && Math.abs(y - (layerY + height)) <= halfHandle) {
+          return "bottom-right";
+        }
+
+        // Top
+        if (Math.abs(x - (layerX + width / 2)) <= halfHandle && Math.abs(y - layerY) <= halfHandle) {
+          return "top";
+        }
+
+        // Right
+        if (Math.abs(x - (layerX + width)) <= halfHandle && Math.abs(y - (layerY + height / 2)) <= halfHandle) {
+          return "right";
+        }
+
+        // Bottom
+        if (Math.abs(x - (layerX + width / 2)) <= halfHandle && Math.abs(y - (layerY + height)) <= halfHandle) {
+          return "bottom";
+        }
+
+        // Left
+        if (Math.abs(x - layerX) <= halfHandle && Math.abs(y - (layerY + height / 2)) <= halfHandle) {
+          return "left";
+        }
+
+        return null;
+      }
+
+      // Fix for ReferenceError: updateLayerList is not defined at selectLayer
+      function updateLayerList() {
+        const layerList = document.getElementById("layerList");
+        layerList.innerHTML = "";
+
+        // Add background layer if exists
+        if (backgroundLayer) {
+          layerList.appendChild(createLayerItem(backgroundLayer, true));
+        }
+
+        // Add layers in reverse order (top layer first in UI)
+        const reversedLayers = [...layers].reverse();
+        if (reversedLayers.length > 0) {
+          reversedLayers.forEach((layer) => {
+            layerList.appendChild(createLayerItem(layer));
+          });
+        } else if (!backgroundLayer) {
+          layerList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px">No layers - paste to start</div>';
+        }
+      }
+
+      function createLayerItem(layer, isBackground = false) {
+        const id = isBackground ? null : layer.id;
+        const name = isBackground ? "Background" : layer.name;
+        const isActive = isBackground ? activeLayerId === null : activeLayerId === id;
+        const colorMode = isBackground ? false : layer.colorMode; // Background should never be in color mode
+        const isPicking = isBackground ? false : layer.isPickerMode; // Background should never be in picker mode
+
+        // Initialize color settings if needed
+        if (!isBackground) {
+          if (layer.colorTolerance === undefined) layer.colorTolerance = 15;
+          if (layer.colorFeather === undefined) layer.colorFeather = 0;
+        }
+
+        const layerItem = document.createElement("div");
+        layerItem.className = `layer-item ${isActive ? "active" : ""} ${isPicking ? "picking" : ""} ${isBackground ? "background" : ""}`;
+        layerItem.onclick = () => selectLayer(id);
+
+        const layerHeader = document.createElement("div");
+        layerHeader.className = "layer-header";
+
+        const layerName = document.createElement("div");
+        layerName.className = "layer-name";
+        layerName.textContent = name;
+
+        // Make layer name editable on click (except for background)
+        if (!isBackground) {
+          layerName.title = "Click to edit layer name";
+          layerName.style.cursor = "text";
+          layerName.contentEditable = "true";
+
+          // Prevent propagation when clicking on the name
+          layerName.onclick = (e) => {
+            e.stopPropagation(); // Prevent layer selection
+          };
+
+          // Handle focus to select all text
+          layerName.onfocus = () => {
+            document.execCommand("selectAll", false, null);
+          };
+
+          // Handle blur to save changes
+          layerName.onblur = () => {
+            const newName = layerName.textContent.trim();
+            if (newName) {
+              const layer = layers.find((l) => l.id === id);
+              if (layer) {
+                layer.name = newName;
+              }
+            } else {
+              layerName.textContent = name; // Restore original name if empty
+            }
+          };
+
+          // Handle Enter key
+          layerName.onkeydown = (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              layerName.blur();
+            } else if (e.key === "Escape") {
+              layerName.textContent = name;
+              layerName.blur();
+            }
+          };
+        }
+
+        layerHeader.appendChild(layerName);
+
+        const layerControls = document.createElement("div");
+        layerControls.className = "layer-controls";
+
+        // Visibility toggle
+        const visibilityBtn = document.createElement("button");
+        visibilityBtn.innerHTML = layer.visible ? "👁️" : "👁️‍🗨️";
+        visibilityBtn.title = layer.visible ? "Hide Layer" : "Show Layer";
+        visibilityBtn.onclick = (e) => {
+          e.stopPropagation();
+          toggleLayerVisibility(isBackground, id);
+        };
+        layerControls.appendChild(visibilityBtn);
+
+        // Color picker button (not for background)
+        if (!isBackground) {
+          const pickBtn = document.createElement("button");
+          pickBtn.innerHTML = "🎨"; // Changed back to palette icon
+          pickBtn.title = "Pick Colors";
+          pickBtn.className = "eyedropper-btn";
+          pickBtn.dataset.layerId = id;
+          // Check if this layer is currently in picker mode
+          if (layer.isPickerMode === true) {
+            pickBtn.classList.add("active");
+          }
+          pickBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleColorPicker(isBackground, id);
+          };
+          layerControls.appendChild(pickBtn);
+        }
+
+        // Replace image button for all layers
+        const replaceBtn = document.createElement("button");
+        replaceBtn.innerHTML = "🔄";
+        replaceBtn.title = "Replace Image";
+        replaceBtn.onclick = (e) => {
+          e.stopPropagation();
+
+          // Remove any existing options popup first
+          const existingOptions = document.querySelector(".paste-options");
+          if (existingOptions && existingOptions.parentNode) {
+            existingOptions.parentNode.removeChild(existingOptions);
+          }
+
+          if (isBackground) {
+            // For background, show options to paste or upload
+            const rect = e.target.getBoundingClientRect();
+            const options = document.createElement("div");
+            options.className = "paste-options";
+            options.style.display = "flex";
+            options.style.position = "absolute";
+            options.style.top = rect.bottom + 5 + "px";
+            options.style.left = rect.left + "px";
+            options.style.zIndex = "2000";
+
+            const pasteBtn = document.createElement("button");
+            pasteBtn.textContent = "📋 Paste from Clipboard";
+            pasteBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              pasteBackground();
+            };
+            options.appendChild(pasteBtn);
+
+            const uploadBtn = document.createElement("button");
+            uploadBtn.textContent = "📁 Upload from File";
+            uploadBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              document.getElementById("backgroundFileInput").click();
+            };
+            options.appendChild(uploadBtn);
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "❌ Cancel";
+            cancelBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+            };
+            options.appendChild(cancelBtn);
+
+            document.body.appendChild(options);
+
+            // Close when clicking outside
+            const closeOnClick = (evt) => {
+              if (!options.contains(evt.target) && evt.target !== replaceBtn) {
+                if (options.parentNode) {
+                  options.parentNode.removeChild(options);
+                }
+                document.removeEventListener("click", closeOnClick);
+              }
+            };
+            setTimeout(() => {
+              document.addEventListener("click", closeOnClick);
+            }, 100);
+          } else {
+            // For regular layers, show options to paste or upload
+            const rect = e.target.getBoundingClientRect();
+            const options = document.createElement("div");
+            options.className = "paste-options";
+            options.style.display = "flex";
+            options.style.position = "absolute";
+            options.style.top = rect.bottom + 5 + "px";
+            options.style.left = rect.left + "px";
+            options.style.zIndex = "2000";
+
+            const pasteBtn = document.createElement("button");
+            pasteBtn.textContent = "📋 Paste from Clipboard";
+            pasteBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              // Select the layer first
+              selectLayer(id);
+              pasteImageToLayer(layers.find((l) => l.id === id));
+            };
+            options.appendChild(pasteBtn);
+
+            const uploadBtn = document.createElement("button");
+            uploadBtn.textContent = "📁 Upload from File";
+            uploadBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+              // Store the target layer ID for the file input handler
+              window.targetLayerId = id;
+              document.getElementById("layerFileInput").click();
+            };
+            options.appendChild(uploadBtn);
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "❌ Cancel";
+            cancelBtn.onclick = (evt) => {
+              evt.stopPropagation();
+              if (options.parentNode) {
+                options.parentNode.removeChild(options);
+              }
+            };
+            options.appendChild(cancelBtn);
+
+            document.body.appendChild(options);
+
+            // Close when clicking outside
+            const closeOnClick = (evt) => {
+              if (!options.contains(evt.target) && evt.target !== replaceBtn) {
+                if (options.parentNode) {
+                  options.parentNode.removeChild(options);
+                }
+                document.removeEventListener("click", closeOnClick);
+              }
+            };
+            setTimeout(() => {
+              document.addEventListener("click", closeOnClick);
+            }, 100);
+          }
+        };
+        layerControls.appendChild(replaceBtn);
+
+        // For non-background layers, only add delete button
+        if (!isBackground) {
+          // Delete button
+          const deleteBtn = document.createElement("button");
+          deleteBtn.innerHTML = "🗑️";
+          deleteBtn.title = "Delete Layer";
+          deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            removeLayer(id);
+          };
+          layerControls.appendChild(deleteBtn);
+        }
+
+        layerHeader.appendChild(layerControls);
+        layerItem.appendChild(layerHeader);
+
+        // Add transparency slider for non-background layers
+        if (!isBackground) {
+          const opacityContainer = document.createElement("div");
+          opacityContainer.className = "opacity-control";
+
+          const opacityLabel = document.createElement("div");
+          opacityLabel.className = "opacity-label";
+          opacityLabel.textContent = "Opacity:";
+          opacityContainer.appendChild(opacityLabel);
+
+          const opacityValue = document.createElement("div");
+          opacityValue.className = "opacity-value";
+          opacityValue.textContent = `${Math.round((layer.opacity || 1.0) * 100)}%`;
+          opacityContainer.appendChild(opacityValue);
+
+          const opacitySlider = document.createElement("input");
+          opacitySlider.type = "range";
+          opacitySlider.min = "0";
+          opacitySlider.max = "100";
+          opacitySlider.value = Math.round((layer.opacity || 1.0) * 100);
+          opacitySlider.className = "opacity-slider";
+          opacitySlider.oninput = (e) => {
+            e.stopPropagation();
+            const newOpacity = parseInt(e.target.value) / 100;
+            const layer = layers.find((l) => l.id === id);
+            if (layer) {
+              layer.opacity = newOpacity;
+            }
+            opacityValue.textContent = `${e.target.value}%`;
+            updateDisplay();
+          };
+          opacityContainer.appendChild(opacitySlider);
+
+          layerItem.appendChild(opacityContainer);
+        }
+
+        // Show color controls if layer is in color mode or has selected colors
+        if (!isBackground && (layer.colorMode || (layer.selectedColors && layer.selectedColors.length > 0))) {
+          // Add selected colors if they exist
+          if (layer.selectedColors && layer.selectedColors.length > 0) {
+            const colorsContainer = document.createElement("div");
+            colorsContainer.className = "selected-colors";
+
+            layer.selectedColors.forEach((color, index) => {
+              const swatch = document.createElement("div");
+              swatch.className = "color-swatch";
+              swatch.style.backgroundColor = color;
+              swatch.title = color;
+
+              // Add click handler to remove color
+              swatch.onclick = (e) => {
+                e.stopPropagation();
+                removeSelectedColor(isBackground, id, index);
+              };
+
+              colorsContainer.appendChild(swatch);
+            });
+
+            layerItem.appendChild(colorsContainer);
+          }
+
+          // Add color settings container with tolerance and feather sliders
+          const colorSettingsContainer = document.createElement("div");
+          colorSettingsContainer.className = "color-settings-container";
+
+          // Add tolerance slider
+          const toleranceContainer = document.createElement("div");
+          toleranceContainer.className = "slider-container";
+
+          const toleranceLabel = document.createElement("label");
+          toleranceLabel.textContent = "Tolerance: ";
+          toleranceLabel.htmlFor = "tolerance-slider-" + id;
+
+          const toleranceValue = document.createElement("span");
+          toleranceValue.className = "slider-value";
+          toleranceValue.textContent = layer.colorTolerance;
+          toleranceLabel.appendChild(toleranceValue);
+
+          const toleranceSlider = document.createElement("input");
+          toleranceSlider.type = "range";
+          toleranceSlider.id = "tolerance-slider-" + id;
+          toleranceSlider.min = "1";
+          toleranceSlider.max = "50";
+          toleranceSlider.value = layer.colorTolerance;
+          toleranceSlider.oninput = (e) => {
+            e.stopPropagation();
+            layer.colorTolerance = parseInt(e.target.value);
+            toleranceValue.textContent = layer.colorTolerance;
+            updateExtractedView(false, id);
+          };
+
+          toleranceContainer.appendChild(toleranceLabel);
+          toleranceContainer.appendChild(toleranceSlider);
+          colorSettingsContainer.appendChild(toleranceContainer);
+
+          // Add feather slider
+          const featherContainer = document.createElement("div");
+          featherContainer.className = "slider-container";
+
+          const featherLabel = document.createElement("label");
+          featherLabel.textContent = "Feather: ";
+          featherLabel.htmlFor = "feather-slider-" + id;
+
+          const featherValue = document.createElement("span");
+          featherValue.className = "slider-value";
+          featherValue.textContent = layer.colorFeather;
+          featherLabel.appendChild(featherValue);
+
+          const featherSlider = document.createElement("input");
+          featherSlider.type = "range";
+          featherSlider.id = "feather-slider-" + id;
+          featherSlider.min = "0";
+          featherSlider.max = "200";
+          featherSlider.value = layer.colorFeather;
+          featherSlider.oninput = (e) => {
+            e.stopPropagation();
+            layer.colorFeather = parseInt(e.target.value);
+            featherValue.textContent = layer.colorFeather;
+            updateExtractedView(false, id);
+          };
+
+          featherContainer.appendChild(featherLabel);
+          featherContainer.appendChild(featherSlider);
+          colorSettingsContainer.appendChild(featherContainer);
+
+          layerItem.appendChild(colorSettingsContainer);
+        }
+
+        return layerItem;
+      }
+
+      // Fix for missing functions related to export and clipboard
+      function exportMap() {
+        // Create a new canvas for export
+        const exportCanvas = document.createElement("canvas");
+        const exportCtx = exportCanvas.getContext("2d");
+
+        // Set canvas size based on background or content
+        if (backgroundLayer) {
+          exportCanvas.width = backgroundLayer.width * (backgroundLayer.scale || 1);
+          exportCanvas.height = backgroundLayer.height * (backgroundLayer.scale || 1);
+        } else if (layers.length > 0) {
+          // Find bounds of all layers
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = 0,
+            maxY = 0;
+          layers.forEach((layer) => {
+            const scale = layer.scale || 1;
+            minX = Math.min(minX, layer.x);
+            minY = Math.min(minY, layer.y);
+            maxX = Math.max(maxX, layer.x + layer.width * scale);
+            maxY = Math.max(maxY, layer.y + layer.height * scale);
+          });
+          exportCanvas.width = maxX - minX;
+          exportCanvas.height = maxY - minY;
+        } else {
+          showToast("Nothing to export");
+          return;
+        }
+
+        // Draw background if exists
+        if (backgroundLayer && backgroundLayer.visible) {
+          const bgScale = backgroundLayer.scale || 1;
+          exportCtx.drawImage(backgroundLayer.image, 0, 0, backgroundLayer.width * bgScale, backgroundLayer.height * bgScale);
+        }
+
+        // Draw all visible layers
+        layers.forEach((layer) => {
+          if (layer.visible) {
+            const layerScale = layer.scale || 1;
+            exportCtx.drawImage(
+              layer.image,
+              layer.x - (backgroundLayer ? 0 : minX),
+              layer.y - (backgroundLayer ? 0 : minY),
+              layer.width * layerScale,
+              layer.height * layerScale
+            );
+          }
+        });
+
+        // Create download link
+        const link = document.createElement("a");
+        link.download = "warzone-map-export.png";
+        link.href = exportCanvas.toDataURL("image/png");
+        link.click();
+
+        showToast("Map exported as PNG");
+      }
+
+      function copyToClipboard() {
+        // Create a new canvas for export
+        const exportCanvas = document.createElement("canvas");
+        const exportCtx = exportCanvas.getContext("2d");
+
+        // Set canvas size based on background or content
+        if (backgroundLayer) {
+          exportCanvas.width = backgroundLayer.width * (backgroundLayer.scale || 1);
+          exportCanvas.height = backgroundLayer.height * (backgroundLayer.scale || 1);
+        } else if (layers.length > 0) {
+          // Find bounds of all layers
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = 0,
+            maxY = 0;
+          layers.forEach((layer) => {
+            const scale = layer.scale || 1;
+            minX = Math.min(minX, layer.x);
+            minY = Math.min(minY, layer.y);
+            maxX = Math.max(maxX, layer.x + layer.width * scale);
+            maxY = Math.max(maxY, layer.y + layer.height * scale);
+          });
+          exportCanvas.width = maxX - minX;
+          exportCanvas.height = maxY - minY;
+        } else {
+          showToast("Nothing to copy");
+          return;
+        }
+
+        // Draw background if exists
+        if (backgroundLayer && backgroundLayer.visible) {
+          const bgScale = backgroundLayer.scale || 1;
+          exportCtx.drawImage(backgroundLayer.image, 0, 0, backgroundLayer.width * bgScale, backgroundLayer.height * bgScale);
+        }
+
+        // Draw all visible layers
+        layers.forEach((layer) => {
+          if (layer.visible) {
+            const layerScale = layer.scale || 1;
+            exportCtx.drawImage(
+              layer.image,
+              layer.x - (backgroundLayer ? 0 : minX),
+              layer.y - (backgroundLayer ? 0 : minY),
+              layer.width * layerScale,
+              layer.height * layerScale
+            );
+          }
+        });
+
+        // Copy to clipboard
+        exportCanvas.toBlob((blob) => {
+          try {
+            navigator.clipboard
+              .write([new ClipboardItem({ "image/png": blob })])
+              .then(() => {
+                showToast("Map copied to clipboard");
+              })
+              .catch((err) => {
+                console.error("Failed to copy to clipboard:", err);
+                showToast("Failed to copy to clipboard");
+              });
+          } catch (err) {
+            console.error("Failed to copy to clipboard:", err);
+            showToast("Failed to copy to clipboard - try using Export instead");
+          }
+        });
+      }
+
+      function clearAll() {
+        if (confirm("Clear all layers and background?")) {
+          backgroundLayer = null;
+          layers = [];
+          layerCounter = 1;
+          selectedLayer = null;
+          activeLayerId = null;
+
+          // Reset view
+          mapOffsetX = 0;
+          mapOffsetY = 0;
+          mapZoom = 1.0;
+
+          // Update UI
+          updateLayerList();
+          updateDisplay();
+          updateEmptyState();
+          showToast("All layers cleared");
+        }
+      }
+
+      // Add missing function for replacing selected layer image
+      function replaceSelectedLayerImage() {
+        if (!selectedLayer || selectedLayer === backgroundLayer) {
+          showToast("No regular layer selected for replacement");
+          return;
+        }
+
+        navigator.clipboard
+          .read()
+          .then((clipboardItems) => {
+            let hasImage = false;
+            for (const clipboardItem of clipboardItems) {
+              for (const type of clipboardItem.types) {
+                if (type.startsWith("image/")) {
+                  hasImage = true;
+                  return clipboardItem.getType(type);
+                }
+              }
+            }
+            if (!hasImage) {
+              throw new Error("No image found in clipboard");
+            }
+          })
+          .then((blob) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+
+            img.onload = () => {
+              // Get the device pixel ratio to ensure 1:1 scale
+              const pixelRatio = getDevicePixelRatio();
+
+              // Replace the selected layer's image
+              selectedLayer.width = img.naturalWidth / pixelRatio;
+              selectedLayer.height = img.naturalHeight / pixelRatio;
+              selectedLayer.image = img;
+              selectedLayer.originalImage = img;
+
+              // Reset any color mode settings
+              if (selectedLayer.colorMode) {
+                selectedLayer.selectedColors = [];
+                selectedLayer.colorMode = false;
+              }
+
+              // Update UI
+              updateLayerList();
+              updateDisplay();
+
+              // Show toast notification
+              showToast(`Updated layer: "${selectedLayer.name}" from clipboard`);
+            };
+          })
+          .catch((err) => {
+            console.error("Failed to read clipboard:", err);
+            showToast("Failed to read clipboard. Make sure you copied an image.");
+          });
+      }
+
+      // Add a helper function to hide paste options
+      function hidePasteOptions() {
+        const pasteOptions = document.querySelector(".paste-options");
+        if (pasteOptions && pasteOptions.parentNode) {
+          pasteOptions.parentNode.removeChild(pasteOptions);
+        }
+      }
+
+      // Add mouse wheel event for zooming
+      canvas.addEventListener(
+        "wheel",
+        function (e) {
+          e.preventDefault();
+
+          // Get mouse position relative to canvas
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+
+          // Calculate zoom factor based on wheel delta
+          const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+
+          // Calculate new zoom level
+          const newZoom = mapZoom * zoomFactor;
+
+          // If we have a background, ensure we don't zoom out too far
+          if (backgroundLayer && zoomFactor < 1) {
+            const bgWidth = backgroundLayer.width;
+            const bgHeight = backgroundLayer.height;
+
+            const minZoomX = canvas.width / bgWidth;
+            const minZoomY = canvas.height / bgHeight;
+            const minZoom = Math.min(minZoomX, minZoomY);
+
+            if (newZoom < minZoom) {
+              return; // Don't allow zooming out further
+            }
+          }
+
+          // Calculate mouse position in canvas coordinates before zoom
+          const canvasXBefore = (mouseX - mapOffsetX) / mapZoom;
+          const canvasYBefore = (mouseY - mapOffsetY) / mapZoom;
+
+          // Apply new zoom
+          mapZoom = newZoom;
+
+          // Calculate new offsets to zoom towards mouse position
+          mapOffsetX = mouseX - canvasXBefore * mapZoom;
+          mapOffsetY = mouseY - canvasYBefore * mapZoom;
+
+          // Update display
+          updateDisplay();
+          updateStatus(`Zoom: ${Math.round(mapZoom * 100)}%`);
+        },
+        { passive: false }
+      );
+
+      // Add keyboard event listener for clipboard operations and layer manipulation
+      document.addEventListener("keydown", function (e) {
+        // Check if we're in an input field or contentEditable element
+        const isInEditableElement =
+          document.activeElement.tagName === "INPUT" ||
+          document.activeElement.tagName === "TEXTAREA" ||
+          document.activeElement.getAttribute("contenteditable") === "true";
+
+        // When in color picker mode, always capture keyboard events
+        const isInPickMode = interactionMode === "pick";
+
+        // Track CTRL key state and update display immediately when pressed
+        if (e.key === "Control") {
+          window.ctrlKeyPressed = true;
+          updateDisplay(); // Update immediately to show resize handles
+        }
+
+        // Only process keyboard shortcuts when not in editable elements or when in pick mode
+        if (!isInEditableElement || isInPickMode) {
+          // CTRL+V for paste
+          if (e.ctrlKey && e.key === "v") {
+            e.preventDefault();
+
+            // If no background exists, paste as background
+            if (!backgroundLayer) {
+              pasteBackground();
+            } else {
+              // Otherwise paste as a new layer or to selected layer
+              pasteToMap();
+            }
+            return;
+          }
+
+          // Arrow keys for pixel movement
+          if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+            e.preventDefault();
+
+            // Only move if we have a selected layer that's not the background
+            if (selectedLayer && selectedLayer !== backgroundLayer) {
+              const moveAmount = e.shiftKey ? 10 : 1;
+
+              switch (e.key) {
+                case "ArrowLeft":
+                  selectedLayer.x -= moveAmount;
+                  break;
+                case "ArrowRight":
+                  selectedLayer.x += moveAmount;
+                  break;
+                case "ArrowUp":
+                  selectedLayer.y -= moveAmount;
+                  break;
+                case "ArrowDown":
+                  selectedLayer.y += moveAmount;
+                  break;
+              }
+
+              updateDisplay();
+              updateStatus(`Moved layer: ${e.shiftKey ? "fast" : "pixel"} movement`);
+            }
+            return;
+          }
+
+          // Delete key to remove selected layer
+          if (e.key === "Delete") {
+            e.preventDefault();
+
+            // Only delete if we have a selected layer that's not the background
+            if (selectedLayer && selectedLayer !== backgroundLayer) {
+              const layerIndex = layers.findIndex((l) => l.id === selectedLayer.id);
+              if (layerIndex !== -1) {
+                if (confirm(`Delete layer "${selectedLayer.name}"?`)) {
+                  layers.splice(layerIndex, 1);
+
+                  // Select another layer if available
+                  if (layers.length > 0) {
+                    selectLayer(layers[0].id);
+                  } else {
+                    selectLayer(null); // Select background if no other layers
+                  }
+
+                  updateLayerList();
+                  updateDisplay();
+                  showToast(`Layer "${selectedLayer.name}" removed`);
+                }
+              }
+            }
+            return;
+          }
+        }
+      });
+
+      // Ensure the canvas can receive keyboard focus
+      canvas.tabIndex = 0;
+      canvas.style.outline = "none"; // Remove focus outline
+
+      // Focus the canvas when clicked
+      canvas.addEventListener("click", function () {
+        canvas.focus();
+      });
+
+      // Focus the canvas when canvas container is clicked
+      document.querySelector(".canvas-container").addEventListener("click", function (e) {
+        if (e.target === this) {
+          canvas.focus();
+        }
+      });
+
+      // Focus the canvas on page load
+      window.addEventListener("load", function () {
+        setTimeout(() => canvas.focus(), 100);
+      });
+
+      // Add keyup event listener to track CTRL key release and escape key for color picker
+      document.addEventListener("keyup", function (e) {
+        if (e.key === "Control") {
+          window.ctrlKeyPressed = false;
+          updateDisplay(); // Update immediately to hide resize handles
+        }
+
+        // Escape key to exit color picker mode
+        if (e.key === "Escape" && interactionMode === "pick") {
+          setInteractionMode("pan");
+          showToast("Exited color picker mode");
+        }
+      });
+    </script>
+  </body>
+</html>
