@@ -213,11 +213,35 @@
         border: 1px solid #333;
         border-radius: 4px;
         cursor: pointer;
-        transition: all 0.2s;
+        -webkit-user-select: none; /* Safari */
+        -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* IE10+/Edge */
+        user-select: none; /* Standard */
       }
 
       .layer-item:hover {
         background: #2a2a2a;
+      }
+
+      .layer-item[draggable="true"] {
+        cursor: grab;
+      }
+
+      .layer-item[draggable="true"]:active {
+        cursor: grabbing;
+      }
+
+      /* Disable ALL transitions on draggable items */
+      [draggable] {
+        -webkit-transition: none !important;
+        -moz-transition: none !important;
+        -o-transition: none !important;
+        transition: none !important;
+      }
+
+      /* Make sure no pointer events are captured by child elements during drag */
+      .layer-item[draggable="true"] * {
+        pointer-events: none;
       }
 
       .layer-item.active {
@@ -228,6 +252,88 @@
       .layer-item.picking {
         background: #2c3e50;
         border-color: #e74c3c;
+      }
+
+      .layer-item.dragging {
+        opacity: 0.4;
+        border: 1px dashed #4caf50;
+        background: rgba(76, 175, 80, 0.1);
+        box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
+        transform: scale(0.98);
+        pointer-events: none;
+      }
+
+      .layer-drag-handle {
+        cursor: grab;
+        margin-right: 8px;
+        color: #4caf50;
+        font-size: 16px;
+        padding: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        text-align: center;
+        width: 20px;
+        height: 20px;
+        line-height: 20px;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .layer-drag-handle:hover {
+        color: #fff;
+        background: #4caf50;
+      }
+
+      .layer-drag-handle:active {
+        cursor: grabbing;
+        background: #45a049;
+      }
+
+      .drop-indicator {
+        height: 4px;
+        background-color: #4caf50;
+        margin: 5px 0;
+        border-radius: 3px;
+        transition: all 0.2s ease;
+        position: relative;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+        animation: pulse-indicator 1s infinite alternate;
+      }
+
+      @keyframes pulse-indicator {
+        0% {
+          opacity: 0.7;
+          height: 4px;
+        }
+        100% {
+          opacity: 1;
+          height: 6px;
+        }
+      }
+
+      .drop-indicator::before {
+        content: "";
+        position: absolute;
+        left: -5px;
+        top: -4px;
+        width: 12px;
+        height: 12px;
+        background-color: #4caf50;
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+      }
+
+      .drop-indicator::after {
+        content: "";
+        position: absolute;
+        right: -5px;
+        top: -4px;
+        width: 12px;
+        height: 12px;
+        background-color: #4caf50;
+        border-radius: 50%;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
       }
 
       .layer-header {
@@ -763,6 +869,22 @@
         }
         to {
           transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 0.8;
+          background: rgba(76, 175, 80, 0.3);
+        }
+        100% {
+          transform: scale(1);
           opacity: 1;
         }
       }
@@ -3508,8 +3630,50 @@
         layerItem.className = `layer-item ${isActive ? "active" : ""} ${isPicking ? "picking" : ""} ${isBackground ? "background" : ""}`;
         layerItem.onclick = () => selectLayer(id);
 
+        // Make layer item draggable (except for background)
+        if (!isBackground) {
+          // Set draggable attribute and layer ID
+          layerItem.setAttribute("draggable", "true");
+          layerItem.dataset.layerId = id;
+
+          // We no longer need event listeners here - they're handled globally by document-level handlers
+        }
+
         const layerHeader = document.createElement("div");
         layerHeader.className = "layer-header";
+
+        // Add drag handle (except for background)
+        const layerNameContainer = document.createElement("div");
+        layerNameContainer.style.display = "flex";
+        layerNameContainer.style.alignItems = "center";
+
+        // Add drag handle for non-background layers
+        if (!isBackground) {
+          const dragHandle = document.createElement("div");
+          dragHandle.className = "layer-drag-handle";
+          dragHandle.innerHTML = "≡"; // Easier to grab hamburger icon
+          dragHandle.title = "Drag to reorder layer";
+          // Make handle a visual indicator only - actual dragging happens on the layer item
+          dragHandle.draggable = false;
+
+          // Just stop propagation on mousedown to prevent layer selection
+          dragHandle.addEventListener("mousedown", function (e) {
+            e.stopPropagation();
+          });
+
+          // Add a pulse animation to make the handle more noticeable
+          setTimeout(() => {
+            dragHandle.style.animation = "pulse 1s";
+            dragHandle.style.animationIterationCount = "3";
+          }, 500);
+
+          // Make the drag handle more visibly interactive
+          dragHandle.addEventListener("mousedown", function (e) {
+            // Prevent this click from triggering layer selection
+            e.stopPropagation();
+          });
+          layerNameContainer.appendChild(dragHandle);
+        }
 
         const layerName = document.createElement("div");
         layerName.className = "layer-name";
@@ -3556,7 +3720,8 @@
           };
         }
 
-        layerHeader.appendChild(layerName);
+        layerNameContainer.appendChild(layerName);
+        layerHeader.appendChild(layerNameContainer);
 
         const layerControls = document.createElement("div");
         layerControls.className = "layer-controls";
@@ -4257,6 +4422,424 @@
           setInteractionMode("pan");
           showToast("Exited color picker mode");
         }
+      });
+
+      // Layer drag and drop reordering functions
+      let draggedLayerId = null;
+      let dropIndicator = null;
+
+      // We no longer need these functions as they're replaced by document-level handlers
+      // in the setupLayerListDropTarget function
+
+      // Add the drop indicator creation/removal functions
+      function createDropIndicator() {
+        if (!dropIndicator) {
+          dropIndicator = document.createElement("div");
+          dropIndicator.className = "drop-indicator";
+        }
+        return dropIndicator;
+      }
+
+      function removeDropIndicators() {
+        if (dropIndicator && dropIndicator.parentNode) {
+          dropIndicator.parentNode.removeChild(dropIndicator);
+        }
+      }
+
+      // COMPLETELY REWRITTEN layer reordering function
+      function reorderLayers(sourceId, targetId, position) {
+        try {
+          console.log(`Reordering layer ${sourceId} to ${position} ${targetId}`);
+
+          // Convert IDs to numbers
+          sourceId = parseInt(sourceId);
+          targetId = parseInt(targetId);
+
+          if (sourceId === targetId) {
+            console.log("Source and target are the same, no change needed");
+            return; // No change needed
+          }
+
+          // Find indices of source and target layers
+          const sourceIndex = layers.findIndex((l) => l.id === sourceId);
+          const targetIndex = layers.findIndex((l) => l.id === targetId);
+
+          console.log(`Source index: ${sourceIndex}, Target index: ${targetIndex}`);
+
+          if (sourceIndex === -1 || targetIndex === -1) {
+            console.log("Invalid layers - source or target not found");
+            return; // Invalid layers
+          }
+
+          // IMPORTANT: The layers array is in REVERSE order from the UI display
+          // In the array: first item (index 0) = bottom layer in UI
+          // In the UI: first item (top) = last item in the array
+
+          // Get all layer IDs in their current order (for debugging)
+          const beforeOrder = layers.map((l) => l.id);
+          console.log("Before reordering, layers array (bottom to top):", beforeOrder);
+
+          // Remove the source layer from the array
+          const [movedLayer] = layers.splice(sourceIndex, 1);
+          console.log(`Removed layer ${movedLayer.name} from index ${sourceIndex}`);
+
+          // CRITICAL FIX: We need to handle the array indices correctly
+          // Remember the array order is OPPOSITE of the visual UI order
+
+          // Calculate the new index based on the UI position and the array's reverse order
+          let newIndex;
+
+          // Since we already removed the source layer, we need to adjust the target index
+          // if the source was before the target in the array
+          const adjustedTargetIndex = sourceIndex <= targetIndex ? targetIndex - 1 : targetIndex;
+
+          if (position === "before") {
+            // "Before" in UI means the layer should appear above the target in the UI
+            // In the array, this means AFTER the target (higher index)
+            newIndex = adjustedTargetIndex + 1;
+          } else {
+            // "after"
+            // "After" in UI means the layer should appear below the target in the UI
+            // In the array, this means BEFORE the target (lower index)
+            newIndex = adjustedTargetIndex;
+          }
+
+          // Ensure the index is within bounds
+          newIndex = Math.max(0, Math.min(newIndex, layers.length));
+
+          console.log(`Inserting at new index: ${newIndex}`);
+
+          // Insert the layer at the new position
+          layers.splice(newIndex, 0, movedLayer);
+
+          // Get all layer IDs in their new order (for debugging)
+          const afterOrder = layers.map((l) => l.id);
+          console.log("After reordering, layers array (bottom to top):", afterOrder);
+
+          // Update the UI
+          updateLayerList();
+          updateDisplay();
+
+          // Re-select the moved layer to maintain selection
+          selectLayer(movedLayer.id);
+
+          showToast(`Reordered layer "${movedLayer.name}"`);
+        } catch (err) {
+          console.error("Error during layer reordering:", err);
+          showToast("Error reordering layers");
+        }
+      }
+
+      // Setup layer list as drop target
+      // COMPLETELY REWRITTEN DRAG-AND-DROP IMPLEMENTATION
+      function setupLayerListDropTarget() {
+        const layerList = document.getElementById("layerList");
+
+        // Track drag state globally
+        document.addEventListener("dragstart", function (e) {
+          const layerItem = e.target.closest(".layer-item");
+          if (layerItem && !layerItem.classList.contains("background")) {
+            console.log("GLOBAL DRAGSTART detected on layer:", layerItem.dataset.layerId);
+            draggedLayerId = layerItem.dataset.layerId;
+
+            // CRITICAL: This must be set synchronously during dragstart
+            try {
+              e.dataTransfer.setData("text/plain", draggedLayerId);
+              e.dataTransfer.effectAllowed = "move";
+
+              // Create a custom drag image
+              const layerName = layerItem.querySelector(".layer-name");
+              const nameText = layerName ? layerName.textContent : "Layer";
+
+              const ghostElement = document.createElement("div");
+              ghostElement.textContent = nameText;
+              ghostElement.style.cssText =
+                "padding:10px; background:#333; border:2px solid #4caf50; color:white; border-radius:4px; font-weight:bold; width:200px; text-align:center";
+              document.body.appendChild(ghostElement);
+
+              try {
+                e.dataTransfer.setDragImage(ghostElement, 20, 20);
+              } catch (imgErr) {
+                console.error("Error setting drag image:", imgErr);
+              }
+
+              setTimeout(() => {
+                if (document.body.contains(ghostElement)) {
+                  document.body.removeChild(ghostElement);
+                }
+              }, 0);
+            } catch (err) {
+              console.error("Error in global dragstart:", err);
+            }
+
+            // Add visual feedback
+            setTimeout(() => {
+              layerItem.classList.add("dragging");
+            }, 0);
+
+            // Show toast
+            showToast("Drag to reorder layer");
+          }
+        });
+
+        document.addEventListener("dragend", function (e) {
+          const layerItem = e.target.closest(".layer-item");
+          if (layerItem) {
+            console.log("GLOBAL DRAGEND detected");
+            layerItem.classList.remove("dragging");
+            removeDropIndicators();
+            draggedLayerId = null;
+          }
+        });
+
+        // Handle dragover on the layer list to show drop indicators
+        layerList.addEventListener("dragover", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!draggedLayerId) return;
+
+          // Get all layer items
+          const allLayerItems = Array.from(document.querySelectorAll(".layer-item:not(.background)"));
+          if (allLayerItems.length === 0) return;
+
+          // Get the dragged layer item
+          const draggedItem = document.querySelector(`.layer-item[data-layer-id="${draggedLayerId}"]`);
+          if (!draggedItem) return;
+
+          // Handle special cases for dropping at the very top or bottom
+          const firstItem = allLayerItems[0];
+          const lastItem = allLayerItems[allLayerItems.length - 1];
+          const firstRect = firstItem.getBoundingClientRect();
+          const lastRect = lastItem.getBoundingClientRect();
+
+          // Check if we're above the first item
+          if (e.clientY < firstRect.top) {
+            // Dropping at the very top
+            removeDropIndicators();
+            const indicator = createDropIndicator();
+            layerList.insertBefore(indicator, firstItem);
+            return;
+          }
+
+          // Check if we're below the last item
+          if (e.clientY > lastRect.bottom) {
+            // Dropping at the very bottom
+            removeDropIndicators();
+            const indicator = createDropIndicator();
+            layerList.appendChild(indicator);
+            return;
+          }
+
+          // Find the closest layer item for normal cases
+          const layerItem = findClosestLayerItem(e.clientY);
+          if (!layerItem) return;
+
+          // Don't allow dropping on background or self
+          if (layerItem.classList.contains("background") || layerItem.dataset.layerId === draggedLayerId) {
+            return;
+          }
+
+          // Check if we're trying to drop between the dragged item and its neighbor
+          // This is the case where we shouldn't show a drop indicator
+          const draggedIndex = allLayerItems.indexOf(draggedItem);
+          const targetIndex = allLayerItems.indexOf(layerItem);
+
+          if (Math.abs(draggedIndex - targetIndex) === 1) {
+            // We're adjacent to our current position
+            const rect = layerItem.getBoundingClientRect();
+            const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+            // If we're trying to drop between ourselves and our neighbor, don't show indicator
+            if ((draggedIndex < targetIndex && position === "after") || (draggedIndex > targetIndex && position === "before")) {
+              removeDropIndicators();
+              return;
+            }
+          }
+
+          // Remove existing indicators
+          removeDropIndicators();
+
+          // Determine position
+          const rect = layerItem.getBoundingClientRect();
+          const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+          // Create indicator
+          const indicator = createDropIndicator();
+
+          // Position indicator
+          if (position === "before") {
+            layerItem.parentNode.insertBefore(indicator, layerItem);
+          } else {
+            const nextSibling = layerItem.nextSibling;
+            if (nextSibling) {
+              layerItem.parentNode.insertBefore(indicator, nextSibling);
+            } else {
+              layerItem.parentNode.appendChild(indicator);
+            }
+          }
+        });
+
+        // Handle drop event
+        layerList.addEventListener("drop", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          console.log("DROP EVENT on layer list");
+
+          // Get the dragged layer ID
+          let sourceId = null;
+          try {
+            sourceId = e.dataTransfer.getData("text/plain");
+            console.log("Retrieved source ID from dataTransfer:", sourceId);
+          } catch (err) {
+            console.error("Error getting data from dataTransfer:", err);
+          }
+
+          // Fall back to tracked ID if needed
+          sourceId = sourceId || draggedLayerId;
+
+          if (!sourceId) {
+            console.log("No source ID found for drop operation");
+            return;
+          }
+
+          // Convert to number for consistency
+          sourceId = parseInt(sourceId);
+
+          // Get all layer items
+          const allLayerItems = Array.from(document.querySelectorAll(".layer-item:not(.background)"));
+          if (allLayerItems.length === 0) return;
+
+          // Special case: Dropping at the very top (above first item)
+          const firstItem = allLayerItems[0];
+          const lastItem = allLayerItems[allLayerItems.length - 1];
+          const firstRect = firstItem.getBoundingClientRect();
+
+          if (e.clientY < firstRect.top) {
+            // Move the layer to the top (end of the array)
+            const firstId = parseInt(firstItem.dataset.layerId);
+            console.log("Dropping at the very top, moving layer above:", firstId);
+            reorderLayers(sourceId, firstId, "before");
+            removeDropIndicators();
+            draggedLayerId = null;
+            return;
+          }
+
+          // Special case: Dropping at the very bottom (below last item)
+          const lastRect = lastItem.getBoundingClientRect();
+
+          if (e.clientY > lastRect.bottom) {
+            // Move the layer to the bottom (start of the array)
+            const lastId = parseInt(lastItem.dataset.layerId);
+            console.log("Dropping at the very bottom, moving layer below:", lastId);
+            reorderLayers(sourceId, lastId, "after");
+            removeDropIndicators();
+            draggedLayerId = null;
+            return;
+          }
+
+          // Find target layer for normal cases
+          const targetLayerItem = findClosestLayerItem(e.clientY);
+          if (!targetLayerItem) return;
+
+          // Don't drop on background or self
+          if (targetLayerItem.classList.contains("background")) {
+            showToast("Cannot reorder with background layer");
+            return;
+          }
+
+          const targetId = parseInt(targetLayerItem.dataset.layerId);
+          if (!targetId || targetId === sourceId) {
+            return;
+          }
+
+          // Get indices to check if we're trying to drop between the dragged item and its neighbor
+          const draggedItem = document.querySelector(`.layer-item[data-layer-id="${sourceId}"]`);
+          if (draggedItem) {
+            const draggedIndex = allLayerItems.indexOf(draggedItem);
+            const targetIndex = allLayerItems.indexOf(targetLayerItem);
+
+            if (Math.abs(draggedIndex - targetIndex) === 1) {
+              // We're adjacent to our current position
+              const rect = targetLayerItem.getBoundingClientRect();
+              const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+              // If we're trying to drop between ourselves and our neighbor, don't reorder
+              if ((draggedIndex < targetIndex && position === "after") || (draggedIndex > targetIndex && position === "before")) {
+                console.log("Dropping in the same position, no change needed");
+                removeDropIndicators();
+                draggedLayerId = null;
+                return;
+              }
+            }
+          }
+
+          // Determine position
+          const rect = targetLayerItem.getBoundingClientRect();
+          const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+
+          // Perform reordering
+          console.log(`Reordering layer ${sourceId} ${position} layer ${targetId}`);
+          reorderLayers(sourceId, targetId, position);
+
+          // Clean up
+          removeDropIndicators();
+          draggedLayerId = null;
+
+          // Show confirmation
+          showToast(`Layer reordered successfully`);
+        });
+
+        // Handle drag leave
+        layerList.addEventListener("dragleave", function (e) {
+          if (!layerList.contains(e.relatedTarget)) {
+            removeDropIndicators();
+          }
+        });
+      }
+
+      function findClosestLayerItem(y) {
+        // Get all layer items
+        const layerItems = document.querySelectorAll(".layer-item");
+        if (!layerItems.length) return null;
+
+        // Find the closest layer item to the y position
+        let closest = null;
+        let closestDistance = Infinity;
+
+        layerItems.forEach((item) => {
+          const rect = item.getBoundingClientRect();
+          const distance = Math.abs(y - (rect.top + rect.height / 2));
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closest = item;
+          }
+        });
+
+        return closest;
+      }
+
+      // Initialize drop target on load
+      window.addEventListener("load", function () {
+        setupLayerListDropTarget();
+
+        // Add diagnostic logging to help track drag events
+        document.addEventListener("dragstart", function (e) {
+          console.log("DOCUMENT DRAGSTART detected on:", e.target);
+        });
+
+        document.addEventListener("drag", function (e) {
+          // Log only occasionally to avoid console spam
+          if (Math.random() < 0.05) {
+            console.log("DRAG EVENT CONTINUING");
+          }
+        });
+
+        document.addEventListener("dragend", function (e) {
+          console.log("DOCUMENT DRAGEND detected on:", e.target);
+        });
       });
     </script>
   </body>
