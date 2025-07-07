@@ -28,7 +28,7 @@ A powerful web-based tool for overlaying and aligning territory maps in Warzone 
 
 ## Live Demo
 
-Visit the live tool: [Warzone Territory Overlayer](https://yourusername.github.io/warzone-overlayer)
+Visit the live tool: [Warzone Territory Overlayer](https://cagils.github.io/warzone-tools)
 
 ## Technical Features
 
