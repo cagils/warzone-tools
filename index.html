@@ -223,11 +223,12 @@
         background: #2a2a2a;
       }
 
-      .layer-item[draggable="true"] {
+      /* Drag handle styling */
+      .layer-drag-handle {
         cursor: grab;
       }
 
-      .layer-item[draggable="true"]:active {
+      .layer-drag-handle:active {
         cursor: grabbing;
       }
 
@@ -239,9 +240,28 @@
         transition: none !important;
       }
 
-      /* Make sure no pointer events are captured by child elements during drag */
-      .layer-item[draggable="true"] * {
+      /* Only disable pointer events during actual dragging */
+      .layer-item.dragging * {
         pointer-events: none;
+      }
+
+      /* Make drag handle the only part that starts dragging */
+      .layer-drag-handle {
+        cursor: grab;
+        margin-right: 8px;
+        color: #4caf50;
+        font-size: 16px;
+        padding: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        text-align: center;
+        width: 20px;
+        height: 20px;
+        line-height: 20px;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
       }
 
       .layer-item.active {
@@ -261,23 +281,6 @@
         box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2);
         transform: scale(0.98);
         pointer-events: none;
-      }
-
-      .layer-drag-handle {
-        cursor: grab;
-        margin-right: 8px;
-        color: #4caf50;
-        font-size: 16px;
-        padding: 4px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-        text-align: center;
-        width: 20px;
-        height: 20px;
-        line-height: 20px;
-        touch-action: none;
-        user-select: none;
-        -webkit-user-select: none;
       }
 
       .layer-drag-handle:hover {
@@ -3630,13 +3633,10 @@
         layerItem.className = `layer-item ${isActive ? "active" : ""} ${isPicking ? "picking" : ""} ${isBackground ? "background" : ""}`;
         layerItem.onclick = () => selectLayer(id);
 
-        // Make layer item draggable (except for background)
+        // Set layer ID but don't make the entire layer item draggable
         if (!isBackground) {
-          // Set draggable attribute and layer ID
-          layerItem.setAttribute("draggable", "true");
+          layerItem.setAttribute("draggable", "false");
           layerItem.dataset.layerId = id;
-
-          // We no longer need event listeners here - they're handled globally by document-level handlers
         }
 
         const layerHeader = document.createElement("div");
@@ -3653,13 +3653,10 @@
           dragHandle.className = "layer-drag-handle";
           dragHandle.innerHTML = "≡"; // Easier to grab hamburger icon
           dragHandle.title = "Drag to reorder layer";
-          // Make handle a visual indicator only - actual dragging happens on the layer item
-          dragHandle.draggable = false;
 
-          // Just stop propagation on mousedown to prevent layer selection
-          dragHandle.addEventListener("mousedown", function (e) {
-            e.stopPropagation();
-          });
+          // Make the handle draggable instead of the entire layer item
+          dragHandle.setAttribute("draggable", "true");
+          dragHandle.dataset.layerId = id;
 
           // Add a pulse animation to make the handle more noticeable
           setTimeout(() => {
@@ -3667,9 +3664,8 @@
             dragHandle.style.animationIterationCount = "3";
           }, 500);
 
-          // Make the drag handle more visibly interactive
+          // Handle mousedown to prevent layer selection
           dragHandle.addEventListener("mousedown", function (e) {
-            // Prevent this click from triggering layer selection
             e.stopPropagation();
           });
           layerNameContainer.appendChild(dragHandle);
@@ -3686,9 +3682,13 @@
           layerName.contentEditable = "true";
 
           // Prevent propagation when clicking on the name
-          layerName.onclick = (e) => {
+          layerName.addEventListener("mousedown", (e) => {
             e.stopPropagation(); // Prevent layer selection
-          };
+          });
+
+          layerName.addEventListener("click", (e) => {
+            e.stopPropagation(); // Prevent layer selection
+          });
 
           // Handle focus to select all text
           layerName.onfocus = () => {
@@ -3730,10 +3730,17 @@
         const visibilityBtn = document.createElement("button");
         visibilityBtn.innerHTML = layer.visible ? "👁️" : "👁️‍🗨️";
         visibilityBtn.title = layer.visible ? "Hide Layer" : "Show Layer";
+
+        // Prevent propagation when clicking buttons
+        visibilityBtn.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+        });
+
         visibilityBtn.onclick = (e) => {
           e.stopPropagation();
           toggleLayerVisibility(isBackground, id);
         };
+
         layerControls.appendChild(visibilityBtn);
 
         // Color picker button (not for background)
@@ -3747,6 +3754,12 @@
           if (layer.isPickerMode === true) {
             pickBtn.classList.add("active");
           }
+
+          // Prevent propagation when clicking buttons
+          pickBtn.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+          });
+
           pickBtn.onclick = (e) => {
             e.stopPropagation();
             toggleColorPicker(isBackground, id);
@@ -3758,6 +3771,12 @@
         const replaceBtn = document.createElement("button");
         replaceBtn.innerHTML = "🔄";
         replaceBtn.title = "Replace Image";
+
+        // Prevent propagation when clicking buttons
+        replaceBtn.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+        });
+
         replaceBtn.onclick = (e) => {
           e.stopPropagation();
 
@@ -3895,9 +3914,23 @@
           const deleteBtn = document.createElement("button");
           deleteBtn.innerHTML = "🗑️";
           deleteBtn.title = "Delete Layer";
+
+          // Add mousedown handler to prevent dragging when clicking buttons
+          deleteBtn.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+
+            // Disable dragging on parent when clicking button
+            const parentItem = deleteBtn.closest(".layer-item");
+            if (parentItem) {
+              parentItem.setAttribute("draggable", "false");
+            }
+          });
+
           deleteBtn.onclick = (e) => {
             e.stopPropagation();
             removeLayer(id);
+
+            // No need to re-enable dragging as the layer will be removed
           };
           layerControls.appendChild(deleteBtn);
         }
@@ -3926,6 +3959,27 @@
           opacitySlider.max = "100";
           opacitySlider.value = Math.round((layer.opacity || 1.0) * 100);
           opacitySlider.className = "opacity-slider";
+          // Disable dragging when interacting with the slider
+          opacitySlider.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+
+            // Disable dragging on parent when using slider
+            const parentItem = opacitySlider.closest(".layer-item");
+            if (parentItem) {
+              parentItem.setAttribute("draggable", "false");
+            }
+          });
+
+          opacitySlider.addEventListener("mouseup", (e) => {
+            // Re-enable dragging after using slider
+            const parentItem = opacitySlider.closest(".layer-item");
+            if (parentItem) {
+              setTimeout(() => {
+                parentItem.setAttribute("draggable", "true");
+              }, 100);
+            }
+          });
+
           opacitySlider.oninput = (e) => {
             e.stopPropagation();
             const newOpacity = parseInt(e.target.value) / 100;
@@ -3954,10 +4008,29 @@
               swatch.style.backgroundColor = color;
               swatch.title = color;
 
+              // Add mousedown handler to prevent dragging when clicking color swatches
+              swatch.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+
+                // Disable dragging on parent when clicking swatch
+                const parentItem = swatch.closest(".layer-item");
+                if (parentItem) {
+                  parentItem.setAttribute("draggable", "false");
+                }
+              });
+
               // Add click handler to remove color
               swatch.onclick = (e) => {
                 e.stopPropagation();
                 removeSelectedColor(isBackground, id, index);
+
+                // Re-enable dragging after action is complete
+                const parentItem = swatch.closest(".layer-item");
+                if (parentItem) {
+                  setTimeout(() => {
+                    parentItem.setAttribute("draggable", "true");
+                  }, 100);
+                }
               };
 
               colorsContainer.appendChild(swatch);
@@ -3989,6 +4062,27 @@
           toleranceSlider.min = "1";
           toleranceSlider.max = "50";
           toleranceSlider.value = layer.colorTolerance;
+          // Disable dragging when interacting with the slider
+          toleranceSlider.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+
+            // Disable dragging on parent when using slider
+            const parentItem = toleranceSlider.closest(".layer-item");
+            if (parentItem) {
+              parentItem.setAttribute("draggable", "false");
+            }
+          });
+
+          toleranceSlider.addEventListener("mouseup", (e) => {
+            // Re-enable dragging after using slider
+            const parentItem = toleranceSlider.closest(".layer-item");
+            if (parentItem) {
+              setTimeout(() => {
+                parentItem.setAttribute("draggable", "true");
+              }, 100);
+            }
+          });
+
           toleranceSlider.oninput = (e) => {
             e.stopPropagation();
             layer.colorTolerance = parseInt(e.target.value);
@@ -4019,6 +4113,27 @@
           featherSlider.min = "0";
           featherSlider.max = "200";
           featherSlider.value = layer.colorFeather;
+          // Disable dragging when interacting with the slider
+          featherSlider.addEventListener("mousedown", (e) => {
+            e.stopPropagation();
+
+            // Disable dragging on parent when using slider
+            const parentItem = featherSlider.closest(".layer-item");
+            if (parentItem) {
+              parentItem.setAttribute("draggable", "false");
+            }
+          });
+
+          featherSlider.addEventListener("mouseup", (e) => {
+            // Re-enable dragging after using slider
+            const parentItem = featherSlider.closest(".layer-item");
+            if (parentItem) {
+              setTimeout(() => {
+                parentItem.setAttribute("draggable", "true");
+              }, 100);
+            }
+          });
+
           featherSlider.oninput = (e) => {
             e.stopPropagation();
             layer.colorFeather = parseInt(e.target.value);
@@ -4537,14 +4652,17 @@
 
         // Track drag state globally
         document.addEventListener("dragstart", function (e) {
-          const layerItem = e.target.closest(".layer-item");
-          if (layerItem && !layerItem.classList.contains("background")) {
-            console.log("GLOBAL DRAGSTART detected on layer:", layerItem.dataset.layerId);
-            draggedLayerId = layerItem.dataset.layerId;
+          // Check if the drag started on a drag handle
+          if (e.target.classList.contains("layer-drag-handle")) {
+            console.log("GLOBAL DRAGSTART detected on drag handle:", e.target.dataset.layerId);
+            draggedLayerId = e.target.dataset.layerId;
+
+            // Find the parent layer item to add visual feedback
+            const layerItem = e.target.closest(".layer-item");
 
             // CRITICAL: This must be set synchronously during dragstart
             try {
-              e.dataTransfer.setData("text/plain", draggedLayerId);
+              e.dataTransfer.setData("text/plain", e.target.dataset.layerId);
               e.dataTransfer.effectAllowed = "move";
 
               // Create a custom drag image
@@ -4583,10 +4701,12 @@
         });
 
         document.addEventListener("dragend", function (e) {
-          const layerItem = e.target.closest(".layer-item");
-          if (layerItem) {
+          if (e.target.classList.contains("layer-drag-handle")) {
             console.log("GLOBAL DRAGEND detected");
-            layerItem.classList.remove("dragging");
+            const layerItem = e.target.closest(".layer-item");
+            if (layerItem) {
+              layerItem.classList.remove("dragging");
+            }
             removeDropIndicators();
             draggedLayerId = null;
           }
@@ -4604,6 +4724,7 @@
           if (allLayerItems.length === 0) return;
 
           // Get the dragged layer item
+          // Find the layer item by ID
           const draggedItem = document.querySelector(`.layer-item[data-layer-id="${draggedLayerId}"]`);
           if (!draggedItem) return;
 
