@@ -3292,7 +3292,8 @@
           if (pasteOptions.parentNode) {
             pasteOptions.parentNode.removeChild(pasteOptions);
           }
-          pasteToMap();
+          // Always create a new layer when coming from Add New Layer menu
+          pasteNewLayerFromClipboard();
         };
         pasteOptions.appendChild(pasteBtn1);
 
@@ -3363,6 +3364,80 @@
           pasteOptions.parentNode.removeChild(pasteOptions);
         }
         pasteToMap();
+      }
+
+      // Function to always create a new layer from clipboard, regardless of selection
+      function pasteNewLayerFromClipboard() {
+        navigator.clipboard
+          .read()
+          .then((clipboardItems) => {
+            let hasImage = false;
+            for (const clipboardItem of clipboardItems) {
+              for (const type of clipboardItem.types) {
+                if (type.startsWith("image/")) {
+                  hasImage = true;
+                  return clipboardItem.getType(type);
+                }
+              }
+            }
+            if (!hasImage) {
+              throw new Error("No image found in clipboard");
+            }
+          })
+          .then((blob) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(blob);
+
+            img.onload = () => {
+              // Get the device pixel ratio to ensure 1:1 scale
+              const pixelRatio = getDevicePixelRatio();
+
+              // Create a new layer with the pasted image and auto-generated name
+              const newLayer = {
+                id: layerCounter,
+                name: `Layer ${layerCounter}`,
+                x: 50,
+                y: 50,
+                width: img.naturalWidth / pixelRatio,
+                height: img.naturalHeight / pixelRatio,
+                visible: true,
+                colorMode: false,
+                selectedColors: [],
+                isPickerMode: false,
+                image: img,
+                originalImage: img, // Make sure originalImage is set
+                scale: 1.0,
+                opacity: 1.0,
+              };
+
+              // Increment layer counter
+              layerCounter++;
+
+              console.log(
+                `Layer image dimensions: ${img.naturalWidth}x${img.naturalHeight}, displayed at: ${newLayer.width}x${newLayer.height} with pixel ratio: ${pixelRatio}`
+              );
+
+              // Add to layers array
+              layers.push(newLayer);
+
+              // Select the new layer
+              selectLayer(newLayer.id);
+
+              // Switch to moveScale mode
+              setInteractionMode("moveScale");
+
+              // Update UI
+              updateLayerList();
+              updateDisplay();
+
+              // Show toast notification
+              showToast(`Added new layer: "${newLayer.name}"`);
+            };
+          })
+          .catch((err) => {
+            console.error("Failed to read clipboard:", err);
+            showToast("Failed to read clipboard. Make sure you copied an image.");
+          });
       }
 
       // Functions removed - no longer needed
